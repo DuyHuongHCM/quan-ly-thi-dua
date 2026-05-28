@@ -1,0 +1,2999 @@
+<!doctype html>
+<html lang="vi" class="h-full">
+ <head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Quản Lý Học Sinh & Thi Đua</title>
+  <script src="https://cdn.tailwindcss.com/3.4.17"></script>
+  <script src="https://cdn.jsdelivr.net/npm/lucide@0.263.0/dist/umd/lucide.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+  <script src="./_sdk/element_sdk.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@300;400;500;600;700&amp;display=swap" rel="stylesheet">
+  <script type="text/javascript">
+    // Cấu hình Firebase Cloud chế độ đám mây thời gian thực
+    
+  const firebaseConfig = {
+			apiKey: "AIzaSyAPxckGbSh74tOdJpUnVKY3krLyBlJqHEY",
+			authDomain: "thidua-pdh.firebaseapp.com",
+			projectId: "thidua-pdh",
+			storageBucket: "thidua-pdh.firebasestorage.app",
+			messagingSenderId: "683199553309",
+			appId: "1:683199553309:web:dc5a65fe37cb207581cbf4",
+			measurementId: "G-X0G6G46PZ6"
+	window.__firebase_config = firebaseConfig;
+};
+  </script>
+  <style>
+    * { font-family: 'Be Vietnam Pro', sans-serif; }
+    
+    /* Màu sắc theo khối lớp */
+    .grade-6 { background: #e0f2fe; border-left: 4px solid #0284c7; }
+    .grade-7 { background: #dcfce7; border-left: 4px solid #16a34a; }
+    .grade-8 { background: #fef3c7; border-left: 4px solid #d97706; }
+    .grade-9 { background: #fce7f3; border-left: 4px solid #db2777; }
+    
+    /* Thiết lập in ấn đặc biệt */
+    @media print {
+      body {
+        background: white !important;
+        color: black !important;
+      }
+      #app {
+        display: none !important;
+      }
+      #print-area {
+        display: block !important;
+        width: 100% !important;
+        margin: 0 !important;
+        padding: 0 !important;
+      }
+      .no-print {
+        display: none !important;
+      }
+    }
+    @media screen {
+      #print-area {
+        display: none;
+      }
+    }
+  </style>
+  <style>body { box-sizing: border-box; }</style>
+  <script src="./_sdk/data_sdk.js" type="text/javascript"></script>
+
+  <!-- Firebase SDK Modules -->
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+    import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+    import { getFirestore, doc, setDoc, getDoc, collection, onSnapshot } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+    
+    window.FirebaseSDK = { initializeApp, getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged, getFirestore, doc, setDoc, getDoc, collection, onSnapshot };
+    window.dispatchEvent(new Event('firebase-sdk-ready'));
+  </script>
+ </head>
+ <body class="h-full bg-slate-900 text-white overflow-auto flex flex-col">
+
+  <!-- Incident & Crash Warning Banner -->
+  <div id="incident-banner" class="hidden bg-gradient-to-r from-amber-600 to-red-600 p-4 shadow-xl border-b border-amber-500 text-white z-40">
+    <div class="max-w-7xl mx-auto flex flex-col sm:flex-row justify-between items-center gap-3">
+      <div class="flex items-center gap-3">
+        <div class="p-2 bg-black/20 rounded-lg">
+          <i data-lucide="alert-triangle" class="w-6 h-6 text-amber-200"></i>
+        </div>
+        <div>
+          <strong class="text-sm font-bold block uppercase tracking-wide">⚠️ Phát hiện hệ thống vừa khởi động lại sau sự cố đột ngột</strong>
+          <span class="text-xs text-amber-100 block mt-0.5">Dữ liệu rèn luyện và học sinh đã được khôi phục thành công về bộ nhớ đệm an toàn lúc: <span id="incident-time" class="font-bold underline"></span>. Hãy xuất file dự phòng ngay!</span>
+        </div>
+      </div>
+      <div class="flex gap-2 shrink-0">
+        <button onclick="downloadBackup()" class="bg-white text-rose-700 hover:bg-slate-100 px-4 py-2 rounded-lg text-xs font-bold transition shadow-md flex items-center gap-1.5 active:scale-95">
+          <i data-lucide="download" class="w-3.5 h-3.5"></i> Tải file sao lưu (.json)
+        </button>
+        <button onclick="dismissIncidentBanner()" class="bg-black/30 hover:bg-black/45 text-white px-3 py-2 rounded-lg text-xs font-semibold transition">
+          Bỏ qua
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Optimized Progress Loading Overlay -->
+  <div id="loading-overlay" class="hidden fixed inset-0 bg-slate-950/90 z-50 flex flex-col items-center justify-center space-y-5 px-6">
+    <div class="relative flex items-center justify-center">
+      <div class="animate-spin rounded-full h-24 w-24 border-t-4 border-b-4 border-indigo-500"></div>
+      <span id="loading-percent" class="absolute text-base font-black text-indigo-300">0%</span>
+    </div>
+    <div class="text-center space-y-1">
+      <p id="loading-title" class="text-indigo-200 font-bold text-sm">Đang nạp và tối ưu hóa dữ liệu học sinh...</p>
+      <p id="loading-subtitle" class="text-slate-400 text-xs">Vui lòng không đóng trình duyệt hoặc làm mới trang.</p>
+    </div>
+    
+    <!-- Progress Bar Tracker -->
+    <div class="w-full max-w-md bg-slate-800 rounded-full h-3.5 overflow-hidden border border-slate-700 p-0.5">
+      <div id="loading-progress-bar" class="bg-gradient-to-r from-indigo-500 via-purple-500 to-emerald-500 h-full rounded-full transition-all duration-100" style="width: 0%"></div>
+    </div>
+  </div>
+  
+  <div id="app" class="w-full h-full flex flex-col no-print">
+   <!-- Header -->
+   <header class="bg-gradient-to-r from-indigo-700 via-purple-700 to-indigo-800 p-4 shadow-lg flex flex-col md:flex-row md:justify-between md:items-center gap-2">
+    <div>
+      <h1 id="main-title" class="text-xl md:text-2xl font-bold flex items-center gap-2">
+        <i data-lucide="database" class="w-6 h-6 text-purple-300"></i> Quản Lý Học Sinh & Thi Đua THCS
+      </h1>
+      <p id="system-mode-text" class="text-indigo-200 text-xs md:text-sm mt-0.5">Đang khởi động hệ thống...</p>
+    </div>
+    <div class="flex flex-wrap gap-2 self-start md:self-auto">
+      <button onclick="openQrModal()" class="bg-emerald-600 hover:bg-emerald-500 px-3 py-1.5 rounded-lg text-xs font-bold text-white border border-emerald-400/30 transition flex items-center gap-1.5 shadow">
+        <i data-lucide="qr-code" class="w-3.5 h-3.5"></i> Kết nối Điện thoại (QR)
+      </button>
+      <button onclick="loadSampleData()" class="bg-indigo-600 hover:bg-indigo-500 px-3 py-1.5 rounded-lg text-xs font-semibold text-white border border-indigo-400/30 transition flex items-center gap-1.5 shadow">
+        <i data-lucide="info" class="w-3.5 h-3.5"></i> Sử dụng dữ liệu mẫu
+      </button>
+      <button onclick="clearAllDataPrompt()" class="bg-rose-600 hover:bg-rose-500 px-3 py-1.5 rounded-lg text-xs font-semibold text-white border border-rose-500/30 transition flex items-center gap-1.5 shadow">
+        <i data-lucide="trash-2" class="w-3.5 h-3.5"></i> Xóa sạch dữ liệu
+      </button>
+    </div>
+   </header>
+
+   <!-- Tabs Navigation (Responsive design) -->
+   <nav class="flex bg-slate-800 border-b border-slate-700 sticky top-0 z-30 overflow-x-auto scrollbar-none">
+    <button onclick="switchTab('import')" id="tab-import" class="flex-1 min-w-[120px] py-3 text-xs md:text-sm font-medium text-indigo-400 border-b-2 border-indigo-400 transition flex items-center justify-center whitespace-nowrap"> 
+      <i data-lucide="upload" class="inline w-4 h-4 mr-1.5"></i>Nhập Excel / Sao Lưu
+    </button> 
+    <button onclick="switchTab('search')" id="tab-search" class="flex-1 min-w-[120px] py-3 text-xs md:text-sm font-medium text-slate-400 border-b-2 border-transparent transition flex items-center justify-center whitespace-nowrap"> 
+      <i data-lucide="search" class="inline w-4 h-4 mr-1.5"></i>Tra cứu học sinh
+    </button>
+    <button onclick="switchTab('rules')" id="tab-rules" class="flex-1 min-w-[120px] py-3 text-xs md:text-sm font-medium text-slate-400 border-b-2 border-transparent transition flex items-center justify-center whitespace-nowrap"> 
+      <i data-lucide="shield-alert" class="inline w-4 h-4 mr-1.5"></i>Danh mục Lỗi
+    </button>
+    <button onclick="switchTab('logs')" id="tab-logs" class="flex-1 min-w-[120px] py-3 text-xs md:text-sm font-medium text-slate-400 border-b-2 border-transparent transition flex items-center justify-center whitespace-nowrap"> 
+      <i data-lucide="history" class="inline w-4 h-4 mr-1.5"></i>Sổ tay Vi phạm
+    </button>
+    <button onclick="switchTab('report')" id="tab-report" class="flex-1 min-w-[120px] py-3 text-xs md:text-sm font-medium text-slate-400 border-b-2 border-transparent transition flex items-center justify-center whitespace-nowrap"> 
+      <i data-lucide="award" class="inline w-4 h-4 mr-1.5"></i>Xem Báo cáo & Thi đua
+    </button>
+   </nav>
+
+   <!-- Main Content Window -->
+   <div class="flex-1 overflow-auto p-4 md:p-6 max-w-7xl w-full mx-auto space-y-6">
+    
+    <!-- 1. IMPORT TAB PANEL -->
+    <div id="panel-import" class="space-y-6">
+     <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+       <!-- Left column: Excel Upload -->
+       <div class="lg:col-span-2 bg-slate-800 rounded-xl p-6 border-2 border-dashed border-slate-600 text-center hover:border-indigo-500 transition-colors flex flex-col justify-center min-h-[220px]">
+        <i data-lucide="file-spreadsheet" class="mx-auto w-12 h-12 text-indigo-400 mb-2"></i>
+        <h3 class="text-base font-bold mb-1 text-slate-100">Nạp danh sách từ tệp Excel</h3>
+        <p class="text-slate-400 text-xs max-w-md mx-auto mb-4">Hệ thống áp dụng thuật toán phân khúc chống treo trình duyệt khi đọc file dữ liệu lớn.</p>
+        
+        <div>
+          <label class="inline-flex bg-indigo-600 hover:bg-indigo-500 active:scale-95 px-5 py-2 rounded-lg text-xs font-semibold cursor-pointer transition shadow-lg items-center gap-2"> 
+            <i data-lucide="upload" class="w-3.5 h-3.5"></i> Chọn file Excel (.xlsx, .xls)
+            <input type="file" id="file-input" accept=".xlsx,.xls" onchange="handleFile(event)" class="hidden"> 
+          </label>
+        </div>
+       </div>
+
+       <!-- Right column: JSON Backup/Restore Board -->
+       <div class="bg-slate-800/90 rounded-xl p-5 border border-slate-700 flex flex-col justify-between">
+         <div>
+           <h3 class="font-bold text-sm text-indigo-300 flex items-center gap-2 mb-2">
+             <i data-lucide="shield-check" class="w-4 h-4 text-emerald-400"></i> Sao lưu & Khôi phục thủ công
+           </h3>
+           <p class="text-slate-400 text-[11px] leading-relaxed mb-4">
+             Đảm bảo an toàn tuyệt đối cho dữ liệu học đường bao gồm danh sách học sinh, danh mục lỗi và sổ ghi nhận vi phạm tuần tự.
+           </p>
+         </div>
+
+         <div class="space-y-2.5">
+           <!-- Export Backup -->
+           <button onclick="downloadBackup()" class="w-full bg-slate-700/80 hover:bg-slate-700 text-white border border-slate-600 py-2.5 px-4 rounded-lg text-xs font-semibold flex items-center justify-center gap-2 transition active:scale-95">
+             <i data-lucide="download-cloud" class="w-4 h-4 text-sky-400"></i> Xuất file Sao lưu hệ thống (.json)
+           </button>
+           
+           <!-- Import Backup -->
+           <label class="w-full bg-emerald-700/40 hover:bg-emerald-700/60 text-emerald-300 border border-emerald-500/30 py-2.5 px-4 rounded-lg text-xs font-semibold flex items-center justify-center gap-2 transition cursor-pointer active:scale-95 text-center">
+             <i data-lucide="upload-cloud" class="w-4 h-4 text-emerald-400"></i> Khôi phục dữ liệu từ file (.json)
+             <input type="file" id="backup-input" accept=".json" onchange="handleJsonRestore(event)" class="hidden">
+           </label>
+         </div>
+       </div>
+     </div>
+
+     <div id="import-status" class="hidden bg-emerald-950/80 border border-emerald-600 rounded-lg p-3 text-emerald-300 text-sm text-center flex items-center justify-center gap-2"></div>
+
+     <!-- Column Mapping Interface -->
+     <div id="mapping-card" class="hidden bg-slate-800 rounded-xl p-5 border border-slate-700 space-y-4 shadow-xl">
+       <div class="border-b border-slate-700 pb-3 flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2">
+         <h3 class="font-bold text-base text-indigo-300 flex items-center gap-2">
+           <i data-lucide="settings-2" class="w-5 h-5"></i> Cấu hình liên kết cột dữ liệu Excel
+         </h3>
+         <div class="flex items-center gap-2 bg-slate-900 px-3 py-1.5 rounded-lg border border-slate-700">
+           <label class="text-xs text-slate-400 whitespace-nowrap">Chọn Sheet:</label>
+           <select id="sheet-selector" onchange="onSheetSelected()" class="bg-transparent text-xs focus:outline-none text-white font-bold cursor-pointer"></select>
+         </div>
+       </div>
+
+       <p class="text-slate-400 text-xs italic">
+         * Hàng cấu hình cân chỉnh cột dữ liệu. Vui lòng kiểm tra lại:
+       </p>
+
+       <!-- Column Balanced grid -->
+       <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-3">
+         <!-- Full name mapping -->
+         <div class="bg-slate-900/50 p-3 rounded-lg border border-slate-700/60 flex flex-col justify-between min-h-[105px]">
+           <label class="text-xs font-bold text-indigo-300 h-10 flex items-center gap-1 leading-tight">
+             Họ và tên <span class="text-rose-500">*</span>
+           </label>
+           <select id="map-name" class="w-full bg-slate-800 border border-slate-600 rounded px-2.5 py-2 text-xs text-white focus:outline-none focus:border-indigo-500 cursor-pointer mt-auto"></select>
+         </div>
+         <!-- Class mapping -->
+         <div class="bg-slate-900/50 p-3 rounded-lg border border-slate-700/60 flex flex-col justify-between min-h-[105px]">
+           <label class="text-xs font-bold text-indigo-300 h-10 flex items-center gap-1 leading-tight">
+             Lớp học <span class="text-rose-500">*</span>
+           </label>
+           <select id="map-class" class="w-full bg-slate-800 border border-slate-600 rounded px-2.5 py-2 text-xs text-white focus:outline-none focus:border-indigo-500 cursor-pointer mt-auto"></select>
+         </div>
+         <!-- Gender mapping -->
+         <div class="bg-slate-900/50 p-3 rounded-lg border border-slate-700/60 flex flex-col justify-between min-h-[105px]">
+           <label class="text-xs font-bold text-slate-300 h-10 flex items-center gap-1 leading-tight">Giới tính</label>
+           <select id="map-gender" class="w-full bg-slate-800 border border-slate-600 rounded px-2.5 py-2 text-xs text-white focus:outline-none focus:border-indigo-500 cursor-pointer mt-auto"></select>
+         </div>
+         <!-- Birth year mapping -->
+         <div class="bg-slate-900/50 p-3 rounded-lg border border-slate-700/60 flex flex-col justify-between min-h-[105px]">
+           <label class="text-xs font-bold text-slate-300 h-10 flex items-center gap-1 leading-tight">Năm sinh</label>
+           <select id="map-birth" class="w-full bg-slate-800 border border-slate-600 rounded px-2.5 py-2 text-xs text-white focus:outline-none focus:border-indigo-500 cursor-pointer mt-auto"></select>
+         </div>
+         <!-- Phone 1 mapping -->
+         <div class="bg-slate-900/50 p-3 rounded-lg border border-slate-700/60 flex flex-col justify-between min-h-[105px]">
+           <label class="text-xs font-bold text-slate-300 h-10 flex items-center gap-1 leading-tight">Số điện thoại 1</label>
+           <select id="map-phone" class="w-full bg-slate-800 border border-slate-600 rounded px-2.5 py-2 text-xs text-white focus:outline-none focus:border-indigo-500 cursor-pointer mt-auto"></select>
+         </div>
+         <!-- Phone 2 mapping -->
+         <div class="bg-slate-900/50 p-3 rounded-lg border border-slate-700/60 flex flex-col justify-between min-h-[105px]">
+           <label class="text-xs font-bold text-slate-300 h-10 flex items-center gap-1 leading-tight">Số điện thoại 2</label>
+           <select id="map-phone2" class="w-full bg-slate-800 border border-slate-600 rounded px-2.5 py-2 text-xs text-white focus:outline-none focus:border-indigo-500 cursor-pointer mt-auto"></select>
+         </div>
+         <!-- Boarding mapping -->
+         <div class="bg-slate-900/50 p-3 rounded-lg border border-slate-700/60 flex flex-col justify-between min-h-[105px]">
+           <label class="text-xs font-bold text-emerald-400 h-10 flex items-center gap-1 leading-tight">Bán trú</label>
+           <select id="map-boarding" class="w-full bg-slate-800 border border-slate-600 rounded px-2.5 py-2 text-xs text-white focus:outline-none focus:border-indigo-500 cursor-pointer mt-auto"></select>
+         </div>
+       </div>
+
+       <div class="flex justify-end pt-2 border-t border-slate-700">
+         <button onclick="confirmImport()" class="bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 px-6 py-2.5 rounded-lg text-sm font-semibold text-white shadow-lg flex items-center gap-2 transition-transform active:scale-95">
+           <i data-lucide="user-check" class="w-4 h-4"></i> Xác nhận và nạp dữ liệu học sinh
+         </button>
+       </div>
+     </div>
+
+     <!-- Import Data Preview Section -->
+     <div id="preview-section" class="hidden space-y-3">
+      <div class="flex justify-between items-center">
+        <h3 class="font-bold text-slate-300 flex items-center gap-1.5">
+          <i data-lucide="eye" class="w-4 h-4 text-indigo-400"></i> Danh sách nhập trước (Xem thử 5 học sinh đầu)
+        </h3>
+        <span class="text-xs text-slate-400">Lưu trong bộ nhớ tạm</span>
+      </div>
+      <div id="preview-list" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-3"></div>
+     </div>
+    </div>
+
+    <!-- 2. SEARCH TAB PANEL -->
+    <div id="panel-search" class="hidden space-y-4">
+     <div class="relative">
+      <i data-lucide="search" class="absolute left-3.5 top-3.5 w-5 h-5 text-slate-400"></i> 
+      <input id="search-input" type="text" placeholder="Tìm tên học sinh (Ví dụ: Thảo, Thành, Bảo... hoặc gõ lớp, SĐT)" oninput="onSearchInput(this.value)" class="w-full bg-slate-800 border border-slate-600 rounded-xl pl-11 pr-4 py-3.5 text-white placeholder-slate-450 focus:outline-none focus:border-indigo-500 transition-all shadow-inner text-base">
+     </div>
+     
+     <div class="flex gap-2 flex-wrap items-center">
+      <span class="text-xs font-semibold uppercase tracking-wider text-slate-400 mr-2">Bộ lọc khối lớp:</span>
+      <button onclick="filterGrade(0)" id="filter-all" class="px-4 py-1.5 rounded-full bg-indigo-600 text-white text-xs font-bold transition shadow">Tất cả</button> 
+      <button onclick="filterGrade(6)" id="filter-6" class="px-4 py-1.5 rounded-full bg-slate-800 text-slate-300 text-xs font-semibold hover:bg-sky-600/30 transition">Khối 6</button> 
+      <button onclick="filterGrade(7)" id="filter-7" class="px-4 py-1.5 rounded-full bg-slate-800 text-slate-300 text-xs font-semibold hover:bg-emerald-600/30 transition">Khối 7</button> 
+      <button onclick="filterGrade(8)" id="filter-8" class="px-4 py-1.5 rounded-full bg-slate-800 text-slate-300 text-xs font-semibold hover:bg-amber-600/30 transition">Khối 8</button> 
+      <button onclick="filterGrade(9)" id="filter-9" class="px-4 py-1.5 rounded-full bg-slate-800 text-slate-300 text-xs font-semibold hover:bg-pink-600/30 transition">Khối 9</button>
+     </div>
+     
+     <div id="search-count" class="text-slate-400 text-sm font-semibold italic">Chưa có dữ liệu học sinh trong hệ thống. Hãy chọn dữ liệu mẫu hoặc nhập từ Excel!</div>
+     
+     <!-- Search Results Grid -->
+     <div id="search-results" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3"></div>
+
+     <!-- Pagination / Lazy Load -->
+     <div id="search-more-container" class="hidden text-center py-4">
+       <button onclick="showMoreSearchResults()" class="bg-indigo-600 hover:bg-indigo-500 text-white px-6 py-3 rounded-xl text-xs font-bold transition shadow-lg inline-flex items-center gap-2 active:scale-95">
+         <i data-lucide="chevrons-down" class="w-4 h-4"></i> Xem thêm kết quả...
+       </button>
+     </div>
+
+     <!-- Student Detail Modal with integrated Violation Ledger -->
+     <div id="detail-modal" class="hidden fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4 backdrop-blur-sm overflow-y-auto">
+      <div class="bg-slate-800 rounded-2xl w-full max-w-lg p-6 space-y-4 border border-slate-700 shadow-2xl relative my-8 max-h-[90vh] overflow-y-auto">
+       <div class="flex justify-between items-center">
+        <h3 class="font-bold text-lg text-slate-200">Hồ Sơ Học Sinh Chi Tiết</h3>
+        <button onclick="closeDetail()" class="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-700 transition">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+       </div>
+       <div id="detail-content" class="space-y-4"></div>
+      </div>
+     </div>
+
+     <!-- Violation Quick Log Modal Form -->
+     <div id="violation-modal" class="hidden fixed inset-0 bg-black/85 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
+       <div class="bg-slate-800 rounded-2xl w-full max-w-md p-6 space-y-4 border border-red-500/30 shadow-2xl relative">
+         <div class="flex justify-between items-center pb-2 border-b border-slate-700">
+           <h3 class="font-bold text-base text-rose-400 flex items-center gap-1.5">
+             <i data-lucide="shield-alert" class="w-5 h-5 text-red-500"></i> Ghi nhận vi phạm học sinh
+           </h3>
+           <button onclick="closeViolationModal()" class="p-1.5 rounded-lg text-slate-450 hover:text-white transition">
+             <i data-lucide="x" class="w-4 h-4"></i>
+           </button>
+         </div>
+         
+         <div class="text-slate-300 text-xs py-1 px-3 bg-red-950/40 border border-red-900/30 rounded-lg">
+           Học sinh: <strong id="violation-target-name" class="text-white text-sm">--</strong><br>
+           Lớp học: <strong id="violation-target-class" class="text-indigo-300">--</strong>
+         </div>
+
+         <!-- Input fields for violation details -->
+         <div class="space-y-3">
+           <div>
+             <label class="block text-xs font-bold text-slate-450 mb-1">Chọn lỗi vi phạm <span class="text-rose-500">*</span></label>
+             <select id="violation-type-select" class="w-full bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-red-500 cursor-pointer"></select>
+           </div>
+           
+           <div class="grid grid-cols-2 gap-2">
+             <div>
+               <label class="block text-xs font-bold text-slate-450 mb-1">Ngày vi phạm</label>
+               <input type="date" id="violation-date" onchange="onViolationDateChange(this.value)" class="w-full bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-red-500">
+             </div>
+             <div>
+               <label class="block text-xs font-bold text-slate-450 mb-1">Tuần học</label>
+               <select id="violation-week" class="w-full bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-red-500 cursor-pointer"></select>
+             </div>
+           </div>
+
+           <div class="grid grid-cols-2 gap-2">
+             <div>
+               <label class="block text-xs font-bold text-slate-450 mb-1">Tháng</label>
+               <select id="violation-month" class="w-full bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-red-500 cursor-pointer">
+                 <option value="1">Tháng 1</option>
+                 <option value="2">Tháng 2</option>
+                 <option value="3">Tháng 3</option>
+                 <option value="4">Tháng 4</option>
+                 <option value="5">Tháng 5</option>
+                 <option value="6">Tháng 6</option>
+                 <option value="7">Tháng 7</option>
+                 <option value="8">Tháng 8</option>
+                 <option value="9">Tháng 9</option>
+                 <option value="10">Tháng 10</option>
+                 <option value="11">Tháng 11</option>
+                 <option value="12">Tháng 12</option>
+               </select>
+             </div>
+             <div>
+               <label class="block text-xs font-bold text-slate-450 mb-1">Học kỳ</label>
+               <select id="violation-semester" class="w-full bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-red-500 cursor-pointer">
+                 <option value="Học kỳ I">Học kỳ I</option>
+                 <option value="Học kỳ II">Học kỳ II</option>
+               </select>
+             </div>
+           </div>
+
+           <div>
+             <label class="block text-xs font-bold text-slate-450 mb-1">Ghi chú chi tiết (nếu có)</label>
+             <textarea id="violation-note" rows="2" placeholder="Ví dụ: Đi học muộn 15 phút, tái phạm lần 2..." class="w-full bg-slate-700 border border-slate-600 rounded-lg p-2.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-red-500"></textarea>
+           </div>
+         </div>
+
+         <div class="flex justify-end gap-2 pt-2 border-t border-slate-700">
+           <button onclick="closeViolationModal()" class="bg-slate-700 hover:bg-slate-600 text-slate-300 px-4 py-2 rounded-lg text-xs font-semibold">Hủy bỏ</button>
+           <button onclick="saveStudentViolation()" class="bg-red-600 hover:bg-red-500 text-white px-5 py-2 rounded-lg text-xs font-bold shadow-lg flex items-center gap-1.5 transition-all">
+             <i data-lucide="check" class="w-3.5 h-3.5"></i> Xác nhận vi phạm
+           </button>
+         </div>
+       </div>
+     </div>
+    </div>
+
+    <!-- 3. VIOLATION DIRECTORY TAB PANEL (NEW) -->
+    <div id="panel-rules" class="hidden space-y-6">
+      <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <!-- Add/Edit Rule Form Card -->
+        <div class="bg-slate-800 rounded-xl p-5 border border-slate-700 space-y-4">
+          <div class="border-b border-slate-700 pb-2">
+            <h3 id="rule-form-title" class="font-bold text-sm text-indigo-300 flex items-center gap-1.5">
+              <i data-lucide="plus-circle" class="w-4 h-4 text-emerald-400"></i> Thêm lỗi vi phạm mới
+            </h3>
+          </div>
+          <input type="hidden" id="edit-rule-id" value="">
+          
+          <div class="space-y-3">
+            <div>
+              <label class="block text-xs text-slate-400 font-bold mb-1">Tên lỗi vi phạm <span class="text-rose-500">*</span></label>
+              <input type="text" id="rule-name-input" placeholder="Ví dụ: Sử dụng điện thoại trong lớp" class="w-full bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500">
+            </div>
+            
+            <div class="grid grid-cols-2 gap-2">
+              <div>
+                <label class="block text-xs text-slate-400 font-bold mb-1">Điểm trừ thi đua <span class="text-rose-500">*</span></label>
+                <input type="number" id="rule-points-input" min="0" max="100" step="0.5" placeholder="Ví dụ: 2" class="w-full bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500">
+              </div>
+              <div>
+                <label class="block text-xs text-slate-400 font-bold mb-1">Nhóm chuyên đề</label>
+                <select id="rule-category-input" class="w-full bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-indigo-500 cursor-pointer">
+                  <option value="Nề nếp">Nề nếp</option>
+                  <option value="Chuyên cần">Chuyên cần</option>
+                  <option value="Học tập">Học tập</option>
+                  <option value="Đồng phục">Đồng phục</option>
+                  <option value="Đạo đức">Đạo đức</option>
+                  <option value="Khác">Khác</option>
+                </select>
+              </div>
+            </div>
+          </div>
+
+          <div class="flex justify-end gap-2 pt-2 border-t border-slate-700">
+            <button id="rule-cancel-btn" onclick="resetRuleForm()" class="hidden bg-slate-700 hover:bg-slate-600 text-slate-300 px-3 py-1.5 rounded-lg text-xs font-semibold">Hủy sửa</button>
+            <button onclick="saveRule()" class="bg-indigo-600 hover:bg-indigo-500 text-white px-4 py-1.5 rounded-lg text-xs font-semibold shadow flex items-center gap-1.5">
+              <i data-lucide="check" class="w-3.5 h-3.5"></i> Lưu cấu hình lỗi
+            </button>
+          </div>
+        </div>
+
+        <!-- Rules Directory List -->
+        <div class="lg:col-span-2 bg-slate-800 rounded-xl p-5 border border-slate-700 space-y-4">
+          <div class="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2 pb-2 border-b border-slate-700">
+            <h3 class="font-bold text-sm text-slate-200 flex items-center gap-1.5">
+              <i data-lucide="list-todo" class="w-4 h-4 text-indigo-400"></i> Danh mục quy chế lỗi & Điểm trừ
+            </h3>
+            <span id="rules-count-badge" class="bg-slate-900 text-slate-400 text-2xs px-2 py-0.5 rounded-full border border-slate-700">0 lỗi</span>
+          </div>
+
+          <!-- Responsive Rules Grid/List -->
+          <div class="overflow-x-auto">
+            <table class="w-full text-left text-xs text-slate-300 border-collapse">
+              <thead>
+                <tr class="border-b border-slate-700 text-slate-400">
+                  <th class="py-2.5 px-2">Nhóm</th>
+                  <th class="py-2.5 px-2">Tên vi phạm quy chuẩn</th>
+                  <th class="py-2.5 px-2 text-center">Điểm trừ</th>
+                  <th class="py-2.5 px-2 text-center">Hành động</th>
+                </tr>
+              </thead>
+              <tbody id="rules-table-body" class="divide-y divide-slate-700/50">
+                <!-- Injected via JavaScript -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 4. VIOLATION LOG JOURNAL TAB PANEL (NEW) -->
+    <div id="panel-logs" class="hidden space-y-6">
+      <div class="bg-slate-800 rounded-xl p-5 border border-slate-700 space-y-4">
+        <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-3 border-b border-slate-700 pb-3">
+          <div>
+            <h3 class="font-bold text-slate-200 flex items-center gap-1.5">
+              <i data-lucide="book-open" class="w-5 h-5 text-indigo-400"></i> Sổ tay theo dõi & Nhật ký vi phạm
+            </h3>
+            <p class="text-xs text-slate-400 mt-0.5">Nơi lưu giữ, chỉnh sửa và quản lý lịch sử sai sót của học sinh</p>
+          </div>
+          <div class="flex items-center gap-2">
+            <select id="log-filter-week" onchange="renderViolationLogs()" class="bg-slate-700 text-xs border border-slate-600 rounded px-2.5 py-1.5 text-white focus:outline-none cursor-pointer">
+              <option value="all">Tất cả các tuần</option>
+            </select>
+            <input type="text" id="log-search-input" oninput="renderViolationLogs()" placeholder="Tìm tên HS, lớp..." class="bg-slate-700 text-xs border border-slate-600 rounded px-2.5 py-1.5 text-white focus:outline-none placeholder-slate-400 w-44">
+          </div>
+        </div>
+
+        <!-- Logs Ledger Table -->
+        <div class="overflow-x-auto">
+          <table class="w-full text-left text-xs text-slate-300 border-collapse">
+            <thead>
+              <tr class="border-b border-slate-700 text-slate-400">
+                <th class="py-3 px-2">Thời điểm</th>
+                <th class="py-3 px-2">Học sinh</th>
+                <th class="py-3 px-2 text-center">Lớp</th>
+                <th class="py-3 px-2">Lỗi vi phạm ghi nhận</th>
+                <th class="py-3 px-2 text-center">Trừ điểm</th>
+                <th class="py-3 px-2 text-center">Phân loại</th>
+                <th class="py-3 px-2">Ghi chú</th>
+                <th class="py-3 px-2 text-center">Hành động</th>
+              </tr>
+            </thead>
+            <tbody id="logs-table-body" class="divide-y divide-slate-700/50">
+              <!-- Injected dynamically -->
+            </tbody>
+          </table>
+          <div id="logs-empty-view" class="hidden py-12 text-center text-slate-500 space-y-2">
+            <i data-lucide="file-check-2" class="w-10 h-10 mx-auto text-slate-600"></i>
+            <p class="font-semibold text-slate-400 text-xs">Không phát hiện lượt vi phạm nào trùng khớp với bộ lọc</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 5. REPORT & EMULATION TAB PANEL (UPDATED) -->
+    <div id="panel-report" class="hidden space-y-6">
+     <!-- Quick Dashboard stats -->
+     <div class="bg-slate-800 rounded-xl p-5 border border-slate-700 space-y-4">
+      <h3 class="font-bold text-slate-200 flex items-center gap-1.5 text-base">
+        <i data-lucide="bar-chart-3" class="w-5 h-5 text-indigo-400"></i> Phân tích tổng quan số lượng học sinh các khối lớp
+      </h3>
+      <div id="stats" class="grid grid-cols-2 md:grid-cols-5 gap-3"></div>
+     </div>
+
+     <!-- Live Preview and Actions -->
+     <div class="grid grid-cols-1 lg:grid-cols-4 gap-6">
+       <!-- Selection Navigation -->
+       <div class="lg:col-span-1 space-y-3">
+         <div class="bg-slate-800 rounded-xl p-4 border border-slate-700 space-y-3">
+           <h4 class="font-bold text-sm text-indigo-300">1. Chọn đối tượng báo cáo</h4>
+           
+           <!-- Report category selection -->
+           <div class="space-y-2">
+             <label class="block text-xs text-slate-450 font-semibold">Loại báo cáo xuất bản:</label>
+             <select id="report-type-select" onchange="onReportTypeChange()" class="w-full bg-slate-700 border border-slate-600 rounded-lg px-2.5 py-2 text-sm text-white focus:outline-none focus:border-indigo-500 cursor-pointer font-bold">
+               <option value="students">Danh sách lý lịch học sinh</option>
+               <option value="emulation">Báo cáo thi đua khối lớp</option>
+             </select>
+           </div>
+
+           <!-- SUB-CONTAINER FOR STUDENT LISTS (ORIGINAL) -->
+           <div id="sub-report-students" class="space-y-3">
+             <div class="space-y-2">
+               <label class="block text-xs text-slate-450">Chọn khối học:</label>
+               <select id="report-grade-select" onchange="onReportTargetChange()" class="w-full bg-slate-700 border border-slate-600 rounded-lg px-2.5 py-2 text-xs text-white focus:outline-none focus:border-indigo-500 cursor-pointer">
+                 <option value="all">Tất cả các khối</option>
+                 <option value="6">Chỉ Khối 6</option>
+                 <option value="7">Chỉ Khối 7</option>
+                 <option value="8">Chỉ Khối 8</option>
+                 <option value="9">Chỉ Khối 9</option>
+               </select>
+             </div>
+             
+             <div class="space-y-2">
+               <label class="block text-xs text-slate-450">Chọn lớp cụ thể:</label>
+               <select id="report-class-select" onchange="generateReportPreview()" class="w-full bg-slate-700 border border-slate-600 rounded-lg px-2.5 py-2 text-xs text-white focus:outline-none focus:border-indigo-500 cursor-pointer">
+                 <option value="all">Tất cả lớp học</option>
+               </select>
+             </div>
+
+             <div class="space-y-2">
+               <label class="block text-xs text-slate-450">Lọc theo Bán trú:</label>
+               <select id="report-boarding-select" onchange="generateReportPreview()" class="w-full bg-slate-700 border border-slate-600 rounded-lg px-2.5 py-2 text-xs text-white focus:outline-none focus:border-indigo-500 cursor-pointer">
+                 <option value="all">Tất cả học sinh</option>
+                 <option value="yes">Học sinh đăng ký Bán trú (Có)</option>
+                 <option value="no">Học sinh không Bán trú (Không)</option>
+               </select>
+             </div>
+           </div>
+
+           <!-- SUB-CONTAINER FOR EMULATION CALCULATION (NEW) -->
+           <div id="sub-report-emulation" class="hidden space-y-3">
+             <div class="space-y-2">
+               <label class="block text-xs text-slate-450">Phạm vi thời gian thi đua:</label>
+               <select id="emu-scope-type" onchange="onEmuScopeTypeChange()" class="w-full bg-slate-700 border border-slate-600 rounded-lg px-2.5 py-2 text-xs text-white focus:outline-none focus:border-indigo-500 cursor-pointer">
+                 <option value="week">Xếp hạng theo Tuần</option>
+                 <option value="month">Xếp hạng theo Tháng</option>
+                 <option value="semester">Xếp hạng theo Học kỳ</option>
+               </select>
+             </div>
+
+             <div class="space-y-2">
+               <label class="block text-xs text-slate-450">Chọn mốc thời gian cụ thể:</label>
+               <select id="emu-scope-value" onchange="generateReportPreview()" class="w-full bg-slate-700 border border-slate-600 rounded-lg px-2.5 py-2 text-xs text-white focus:outline-none focus:border-indigo-500 cursor-pointer"></select>
+             </div>
+           </div>
+         </div>
+
+         <div class="space-y-2">
+           <button onclick="exportReport()" class="w-full bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 py-3 rounded-xl font-bold transition shadow-lg flex items-center justify-center gap-2 hover:-translate-y-0.5 active:translate-y-0 text-sm"> 
+             <i data-lucide="file-spreadsheet" class="w-5 h-5"></i> Xuất Excel Bản Đẹp 
+           </button>
+           <button onclick="printReport()" class="w-full bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-500 hover:to-blue-500 py-3 rounded-xl font-bold transition shadow-lg flex items-center justify-center gap-2 hover:-translate-y-0.5 active:translate-y-0 text-sm"> 
+             <i data-lucide="printer" class="w-5 h-5"></i> In báo cáo ngay (Khổ A4)
+           </button>
+           <p class="text-slate-400 text-2xs text-center italic mt-1">Gợi ý: Phiên bản in sẽ tự động căn lề giấy sạch đẹp, ẩn toàn bộ nút bấm.</p>
+         </div>
+       </div>
+
+       <!-- Live Sheet Document Preview -->
+       <div class="lg:col-span-3 space-y-2">
+         <h4 class="font-bold text-sm text-slate-300 flex items-center gap-1.5">
+           <i data-lucide="eye" class="w-4 h-4 text-emerald-400"></i> 2. Bản xem trước trang in (Khổ A4 chuẩn học đường)
+         </h4>
+         <div class="bg-white text-slate-900 rounded-xl p-6 shadow-2xl overflow-x-auto min-h-[600px] border border-slate-200">
+           <!-- Page Paper Container -->
+           <div id="report-preview-sheet" class="mx-auto max-w-[800px] text-xs leading-relaxed space-y-6">
+             <!-- Dynamic preview content will be generated here -->
+           </div>
+         </div>
+       </div>
+     </div>
+    </div>
+
+   </div>
+  </div>
+
+  <!-- HIDDEN PRINT AREA (Only used when calling window.print()) -->
+  <div id="print-area">
+    <div id="print-content" class="text-xs p-8 text-black bg-white"></div>
+  </div>
+
+  <!-- CONNECTION AND QR CODE MODAL -->
+  <div id="qr-modal" class="hidden fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
+    <div class="bg-slate-800 rounded-2xl w-full max-w-md p-6 space-y-5 border border-indigo-500/30 shadow-2xl relative">
+      <div class="flex justify-between items-center pb-2 border-b border-slate-700">
+        <h3 class="font-bold text-base text-emerald-400 flex items-center gap-2">
+          <i data-lucide="qr-code" class="w-5 h-5"></i> Kết nối thiết bị di động
+        </h3>
+        <button onclick="closeQrModal()" class="p-1.5 rounded-lg text-slate-450 hover:text-white transition">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+
+      <div class="text-center space-y-3">
+        <p class="text-xs text-slate-300">
+          GVCN hoặc Giám thị quét mã này bằng điện thoại để chạy hệ thống & phạt vi phạm cực nhanh từ mọi vị trí trong trường học.
+        </p>
+        
+        <!-- Generated QR Code Image -->
+        <div class="bg-white p-4 rounded-xl inline-block shadow-inner mx-auto">
+          <img id="qr-code-img" src="" alt="Mã QR liên kết" class="w-48 h-48 block">
+        </div>
+
+        <div class="bg-slate-900 rounded-lg p-2.5 text-2xs font-mono text-indigo-300 break-all select-all flex items-center justify-between gap-2 border border-slate-700">
+          <span id="qr-link-url" class="truncate block flex-1 text-left">--</span>
+          <button onclick="copyQrLink()" class="bg-indigo-600/30 hover:bg-indigo-600 text-indigo-300 hover:text-white text-3xs px-2 py-1 rounded transition shrink-0">Copy</button>
+        </div>
+      </div>
+
+      <!-- Sync Channel Configuration -->
+      <div class="bg-slate-900/50 p-3.5 rounded-xl border border-slate-700/60 space-y-2.5">
+        <div class="flex justify-between items-center">
+          <label class="text-xs font-bold text-slate-300 flex items-center gap-1">
+            <i data-lucide="radio" class="w-3.5 h-3.5 text-indigo-400 animate-pulse"></i> Mã Kênh Đồng Bộ (Shared Code)
+          </label>
+          <span class="text-4xs uppercase font-extrabold tracking-widest bg-emerald-950 text-emerald-400 px-2 py-0.5 rounded border border-emerald-500/20">Thời gian thực</span>
+        </div>
+        <div class="flex gap-1.5">
+          <input type="text" id="sync-channel-input" placeholder="Ví dụ: PDH_2026" class="flex-1 bg-slate-800 border border-slate-600 rounded-lg px-3 py-1.5 text-xs text-white focus:outline-none focus:border-emerald-400 font-bold uppercase">
+          <button onclick="changeSyncChannel()" class="bg-emerald-600 hover:bg-emerald-500 text-white px-4 py-1.5 rounded-lg text-xs font-bold shadow-md transition active:scale-95">Lưu</button>
+        </div>
+        <p class="text-4xs text-slate-400 leading-relaxed">
+          * Đảm bảo cả máy tính này và điện thoại cùng sử dụng chung một Mã Kênh để dữ liệu phạt lỗi xuất hiện tức thì trên màn hình chính!
+        </p>
+      </div>
+
+      <div class="text-2xs text-slate-450 border-t border-slate-700 pt-3 space-y-1">
+        <p class="font-bold flex items-center gap-1 text-indigo-300"><i data-lucide="help-circle" class="w-3.5 h-3.5"></i> Hướng dẫn kết nối:</p>
+        <p>1. Điện thoại và máy tính nên truy cập chung một link liên kết (hoặc đưa tệp HTML này lên host như Github Pages/Vercel).</p>
+        <p>2. Khi mở bằng điện thoại, hãy bấm mở QR và kiểm tra Mã Kênh đã trùng khớp hoàn toàn.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- FIREBASE TROUBLESHOOT / DIAGNOSTIC MODAL -->
+  <div id="troubleshoot-modal" class="hidden fixed inset-0 bg-black/85 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
+    <div class="bg-slate-800 rounded-2xl w-full max-w-md p-6 space-y-4 border border-rose-500/30 shadow-2xl relative">
+      <div class="flex justify-between items-center pb-2 border-b border-slate-700">
+        <h3 class="font-bold text-base text-rose-400 flex items-center gap-1.5">
+          <i data-lucide="alert-circle" class="w-5 h-5 text-rose-500"></i> Hướng dẫn kích hoạt Đám mây
+        </h3>
+        <button onclick="closeTroubleshootModal()" class="p-1.5 rounded-lg text-slate-450 hover:text-white transition">
+          <i data-lucide="x" class="w-4 h-4"></i>
+        </button>
+      </div>
+
+      <div class="text-xs text-slate-300 space-y-3 leading-relaxed">
+        <p>Hệ thống không thể kết nối đến máy chủ lưu trữ Firebase của bạn. Hãy đảm bảo bạn đã thực hiện đầy đủ 3 bước cấu hình sau trên trang quản trị Firebase Console:</p>
+        
+        <div class="bg-slate-900 p-3 rounded-lg space-y-2 border border-slate-700">
+          <p class="font-bold text-indigo-300">1. Kích hoạt Anonymous Authentication:</p>
+          <p class="text-slate-400 text-3xs">Vào Build -> Authentication -> Sign-in method -> Thêm "Anonymous" (Ẩn danh) và gạt nút "Enable" rồi lưu lại.</p>
+        </div>
+
+        <div class="bg-slate-900 p-3 rounded-lg space-y-2 border border-slate-700">
+          <p class="font-bold text-indigo-300">2. Cấu hình Firestore Rules (Quy chế ghi đọc):</p>
+          <p class="text-slate-400 text-3xs">Vào Build -> Firestore Database -> Thẻ "Rules" và chỉnh sửa dòng quyền cho phép đọc/ghi công cộng:</p>
+          <pre class="bg-slate-950 p-2 rounded text-[10px] text-emerald-400 overflow-x-auto">rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /{document=**} {
+      allow read, write: if true;
+    }
+  }
+}</pre>
+        </div>
+
+        <div class="bg-slate-900 p-3 rounded-lg space-y-1 border border-slate-700">
+          <p class="font-bold text-indigo-300">3. Đảm bảo kết nối Internet:</p>
+          <p class="text-slate-400 text-3xs">Nếu chạy file offline cục bộ, thiết bị của bạn cần kết nối Wifi/3G ổn định để gửi dữ liệu về máy chủ.</p>
+        </div>
+      </div>
+
+      <div class="flex justify-end pt-2 border-t border-slate-700">
+        <button onclick="closeTroubleshootModal()" class="bg-slate-700 hover:bg-slate-600 text-slate-300 px-5 py-2 rounded-lg text-xs font-semibold">Đã hiểu</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- CUSTOM CONFIRMATION MODAL -->
+  <div id="confirm-modal" class="hidden fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
+    <div class="bg-slate-800 rounded-xl max-w-sm w-full p-5 border border-slate-700 shadow-2xl space-y-4">
+      <div class="flex items-center gap-2 text-rose-400">
+        <i data-lucide="alert-circle" class="w-6 h-6"></i>
+        <h4 id="confirm-title" class="font-bold text-base">Xác nhận yêu cầu</h4>
+      </div>
+      <p id="confirm-message" class="text-xs text-slate-300 leading-relaxed">Bạn có chắc chắn muốn thực hiện thao tác này? Thao tác này không thể thu hồi.</p>
+      <div class="flex justify-end gap-2 pt-2 border-t border-slate-700/60">
+        <button onclick="closeConfirm(false)" class="bg-slate-700 hover:bg-slate-600 text-slate-300 px-4 py-2 rounded-lg text-2xs font-bold">Hủy bỏ</button>
+        <button onclick="closeConfirm(true)" class="bg-rose-600 hover:bg-rose-500 text-white px-4 py-2 rounded-lg text-2xs font-bold shadow">Xác nhận</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    let students = [];
+    let violations = [];
+    
+    // Default system rules/violation types 
+    let violationTypes = [
+      { id: 'rule_1', name: 'Đi học muộn (sau hồi trống báo)', points: 2, category: 'Chuyên cần' },
+      { id: 'rule_2', name: 'Không đeo khăn quàng / Phù hiệu / Bảng tên', points: 1, category: 'Đồng phục' },
+      { id: 'rule_3', name: 'Không học bài, chuẩn bị bài hoặc thiếu dụng cụ', points: 2, category: 'Học tập' },
+      { id: 'rule_4', name: 'Làm việc riêng / Gây mất trật tự lớp học', points: 2, category: 'Nề nếp' },
+      { id: 'rule_5', name: 'Sử dụng điện thoại không phục vụ học tập', points: 5, category: 'Nề nếp' },
+      { id: 'rule_6', name: 'Nghỉ học không xin phép giáo viên', points: 5, category: 'Chuyên cần' },
+      { id: 'rule_7', name: 'Vi phạm kiểu tóc / Trang phục sai quy định', points: 2, category: 'Đồng phục' },
+      { id: 'rule_8', name: 'Nói bậy / Đùa nghịch thô bạo gây gổ', points: 5, category: 'Đạo đức' }
+    ];
+
+    let currentGradeFilter = 0;
+    let currentWorkbook = null;
+    let currentRows = [];
+    
+    // Virtual render parameters
+    let searchLimit = 40; 
+    let filteredCache = [];
+
+    // Storage mode indicator
+    let isCloudMode = false;
+
+    // Cloud Database references
+    let db = null;
+    let auth = null;
+    let userId = null;
+    const appId = typeof window.__app_id !== 'undefined' ? window.__app_id : 'default-app-id';
+
+    // Global Confirm Callback holder
+    let confirmCallback = null;
+
+    // Realtime Sync Room Engine (Rule 1 Compliance)
+    let syncUnsubscribe = null;
+    let syncChannelCode = localStorage.getItem("find_hs_sync_channel") || "PDH_2026";
+
+    // ----------------------------------------------------
+    // INDEXEDDB LOCAL BACKUP ENGINE (FOR OFFLINE STABILITY)
+    // ----------------------------------------------------
+    const DB_NAME = "FindHS_LocalDB_Emu";
+    const DB_VERSION = 1;
+    const STORE_NAME = "state_store";
+
+    function getLocalDB() {
+      return new Promise((resolve, reject) => {
+        const request = indexedDB.open(DB_NAME, DB_VERSION);
+        request.onupgradeneeded = (e) => {
+          const db = e.target.result;
+          if (!db.objectStoreNames.contains(STORE_NAME)) {
+            db.createObjectStore(STORE_NAME);
+          }
+        };
+        request.onsuccess = (e) => resolve(e.target.result);
+        request.onerror = (e) => reject(e.target.error);
+      });
+    }
+
+    async function setLocalItem(key, val) {
+      try {
+        const db = await getLocalDB();
+        return new Promise((resolve, reject) => {
+          const tx = db.transaction(STORE_NAME, "readwrite");
+          const store = tx.objectStore(STORE_NAME);
+          const request = store.put(val, key);
+          request.onsuccess = () => resolve();
+          request.onerror = (e) => reject(e.target.error);
+        });
+      } catch (err) {
+        console.warn("IndexedDB Write Blocked:", err);
+      }
+    }
+
+    async function getLocalItem(key) {
+      try {
+        const db = await getLocalDB();
+        return new Promise((resolve, reject) => {
+          const tx = db.transaction(STORE_NAME, "readonly");
+          const store = tx.objectStore(STORE_NAME);
+          const request = store.get(key);
+          request.onsuccess = () => resolve(request.result);
+          request.onerror = (e) => reject(e.target.error);
+        });
+      } catch (err) {
+        console.warn("IndexedDB Read Blocked:", err);
+        return null;
+      }
+    }
+
+    async function deleteLocalItem(key) {
+      try {
+        const db = await getLocalDB();
+        return new Promise((resolve, reject) => {
+          const tx = db.transaction(STORE_NAME, "readwrite");
+          const store = tx.objectStore(STORE_NAME);
+          const request = store.delete(key);
+          request.onsuccess = () => resolve();
+          request.onerror = (e) => reject(e.target.error);
+        });
+      } catch (err) {
+        console.warn("IndexedDB Delete Blocked:", err);
+      }
+    }
+
+    // ----------------------------------------------------
+    // INITIALIZATION & SYNCHRONIZATION ENGINES (CLOUDMYNC 3.0)
+    // ----------------------------------------------------
+    async function initFirebase() {
+      const modeText = document.getElementById('system-mode-text');
+      
+      // Fallback: load state from browser IndexedDB immediately (takes 0.01s)
+      await loadFromLocalIndexedDB();
+
+      if (typeof window.FirebaseSDK === 'undefined' || typeof window.__firebase_config === 'undefined' || !window.__firebase_config) {
+        isCloudMode = false;
+        modeText.innerHTML = `<span class="text-emerald-400 font-bold flex items-center gap-1"><span class="h-2 w-2 rounded-full bg-emerald-500 animate-ping"></span> Chế độ Ngoại tuyến (Đã bảo vệ bằng IndexedDB)</span>`;
+        return;
+      }
+
+      try {
+        let firebaseConfig;
+        if (typeof window.__firebase_config === 'string') {
+          firebaseConfig = JSON.parse(window.__firebase_config);
+        } else {
+          firebaseConfig = window.__firebase_config;
+        }
+
+        const app = window.FirebaseSDK.initializeApp(firebaseConfig);
+        auth = window.FirebaseSDK.getAuth(app);
+        db = window.FirebaseSDK.getFirestore(app);
+
+        // Rule 3: Auth First and await it
+        if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+          await window.FirebaseSDK.signInWithCustomToken(auth, __initial_auth_token);
+        } else {
+          await window.FirebaseSDK.signInAnonymously(auth);
+        }
+
+        window.FirebaseSDK.onAuthStateChanged(auth, async (user) => {
+          if (user) {
+            userId = user.uid;
+            isCloudMode = true;
+            modeText.innerHTML = `<span class="text-sky-400 font-bold flex items-center gap-1"><span class="h-2 w-2 rounded-full bg-sky-500 animate-ping"></span> Chế độ Đám mây (Đang liên kết kênh: ${syncChannelCode})</span>`;
+            
+            // Start listening to the shared sync room real-time!
+            startRealtimeSync();
+          }
+        });
+      } catch (err) {
+        isCloudMode = false;
+        modeText.innerHTML = `
+          <span class="text-rose-400 font-bold flex items-center gap-1 cursor-pointer" onclick="showFirebaseTroubleshoot()">
+            <i data-lucide="alert-circle" class="w-4 h-4 inline"></i> Chế độ Đám mây lỗi (Bấm để xem chi tiết)
+          </span>
+        `;
+        lucide.createIcons();
+        console.warn("Firebase initialization blocked. Running local sandbox mode.", err);
+      }
+    }
+
+    // Real-time synchronization of shared school emulation room (Rule 1 Strict Path)
+    function startRealtimeSync() {
+      if (!db || !isCloudMode) return;
+      if (syncUnsubscribe) syncUnsubscribe();
+
+      const docRef = window.FirebaseSDK.doc(db, 'artifacts', appId, 'public', 'data', 'emulation_saves', syncChannelCode);
+      
+      syncUnsubscribe = window.FirebaseSDK.onSnapshot(docRef, (docSnap) => {
+        if (docSnap.exists()) {
+          const data = docSnap.data();
+          if (data.updatedAt) {
+            let hasChanged = false;
+            
+            // De-serialize and verify state changes
+            if (JSON.stringify(students) !== JSON.stringify(data.students || [])) {
+              students = data.students || [];
+              precalculateKeys(students);
+              hasChanged = true;
+            }
+            if (JSON.stringify(violations) !== JSON.stringify(data.violations || [])) {
+              violations = data.violations || [];
+              hasChanged = true;
+            }
+            if (JSON.stringify(violationTypes) !== JSON.stringify(data.violationTypes || [])) {
+              violationTypes = data.violationTypes || [];
+              hasChanged = true;
+            }
+
+            if (hasChanged) {
+              updateStats();
+              doSearch(document.getElementById('search-input').value);
+              initGlobalDropdowns();
+              onReportTargetChange();
+              renderRules();
+              renderViolationLogs();
+              generateReportPreview();
+              lucide.createIcons();
+              showToast('🔄 Dữ liệu rèn luyện vừa tự động đồng bộ thời gian thực!');
+            }
+          }
+        } else {
+          // If Firestore room is fresh, initialize it with current active local data immediately
+          if (students.length > 0 || violations.length > 0) {
+            saveAutosaveToCloud();
+          }
+        }
+
+        document.getElementById('system-mode-text').innerHTML = `
+          <span class="text-emerald-400 font-bold flex items-center gap-1.5 cursor-pointer" onclick="openQrModal()">
+            <span class="h-2 w-2 rounded-full bg-emerald-400 animate-ping"></span> Chế độ Đám mây (Kênh: ${syncChannelCode})
+          </span>
+        `;
+        lucide.createIcons();
+      }, (err) => {
+        console.error("Realtime sync channel rejected:", err);
+        document.getElementById('system-mode-text').innerHTML = `
+          <span class="text-rose-400 font-bold flex items-center gap-1 cursor-pointer" onclick="showFirebaseTroubleshoot()">
+            <i data-lucide="alert-circle" class="w-4 h-4 inline"></i> Lỗi đồng bộ dữ liệu (Click xem)
+          </span>
+        `;
+        lucide.createIcons();
+      });
+    }
+
+    // Load working data from Local IndexedDB (Runs instantly offline)
+    async function loadFromLocalIndexedDB() {
+      try {
+        const storedState = await getLocalItem("autosave_state_emu");
+        if (storedState) {
+          if (storedState.students && storedState.students.length > 0) {
+            students = storedState.students;
+            precalculateKeys(students);
+          }
+          if (storedState.violationTypes && storedState.violationTypes.length > 0) {
+            violationTypes = storedState.violationTypes;
+          }
+          if (storedState.violations) {
+            violations = storedState.violations;
+          }
+          
+          if (storedState.status === "working") {
+            const dateStr = storedState.updatedAt ? new Date(storedState.updatedAt).toLocaleTimeString('vi-VN') + ' ' + new Date(storedState.updatedAt).toLocaleDateString('vi-VN') : 'vừa qua';
+            document.getElementById('incident-time').textContent = dateStr;
+            document.getElementById('incident-banner').classList.remove('hidden');
+          }
+          
+          updateStats();
+          doSearch('');
+          initGlobalDropdowns();
+          onReportTargetChange();
+          renderRules();
+          renderViolationLogs();
+          lucide.createIcons();
+        } else {
+          initGlobalDropdowns();
+          renderRules();
+          renderViolationLogs();
+        }
+      } catch (e) {
+        console.error("Local recovery crashed:", e);
+      }
+    }
+
+    // Load active working data from cloud
+    async function loadAutosaveFromCloud() {
+      // Handled inside startRealtimeSync() for live collaborative data sharing!
+    }
+
+    // Save working state to BOTH IndexedDB (Offline) & Cloud Firestore (Online)
+    async function saveAutosaveToCloud(cleanExit = false) {
+      const nowStr = new Date().toISOString();
+      const statusValue = (students.length > 0 && !cleanExit) ? 'working' : 'idle';
+
+      // Clean metadata before saving to avoid cyclic issues
+      const cleanStudents = students.map(s => {
+        const { sortKey, nameLower, nameClean, classLower, phoneClean, phone2Clean, grade, ...rest } = s;
+        return rest;
+      });
+
+      // 1. Always back up to local IndexedDB (Highly stable, takes 0.001s)
+      try {
+        await setLocalItem("autosave_state_emu", {
+          students: cleanStudents,
+          violations: violations,
+          violationTypes: violationTypes,
+          updatedAt: nowStr,
+          status: statusValue
+        });
+      } catch (e) {
+        console.error("Local IndexDB write failed:", e);
+      }
+
+      // 2. Write to Cloud Firestore if connected (Rule 1 Strict Path - Shared public emulation room)
+      if (!isCloudMode || !db) return;
+      try {
+        const docRef = window.FirebaseSDK.doc(db, 'artifacts', appId, 'public', 'data', 'emulation_saves', syncChannelCode);
+        await window.FirebaseSDK.setDoc(docRef, {
+          students: cleanStudents,
+          violations: violations,
+          violationTypes: violationTypes,
+          updatedAt: nowStr
+        });
+      } catch (err) {
+        console.error("Cloud autosave rejected:", err);
+      }
+    }
+
+    // Dismiss incident notice
+    async function dismissIncidentBanner() {
+      document.getElementById('incident-banner').classList.add('hidden');
+      await saveAutosaveToCloud(true);
+    }
+
+    // Helper: Remove Vietnamese tones for accentless search
+    function removeVietnameseTones(str) {
+      if (!str) return '';
+      str = str.replace(/à|á|ạ|ả|ã|â|ầ|ấ|ậ|ẩ|ẫ|ă|ằ|ắ|ặ|ẳ|ẵ/g,"a");
+      str = str.replace(/è|é|ẹ|ẻ|ẽ|ê|ề|ế|ệ|ể|ẽ/g,"e");
+      str = str.replace(/ì|í|ị|ỉ|ĩ/g,"i");
+      str = str.replace(/ò|ó|ọ|ỏ|õ|ô|ồ|ố|ộ|ổ|ỗ|ơ|ờ|ớ|ợ|ở|ỡ/g,"o");
+      str = str.replace(/ù|ú|ụ|ủ|ũ|ư|ừ|ứ|ự|ử|ữ/g,"u");
+      str = str.replace(/ỳ|ý|ỵ|ỷ|ỹ/g,"y");
+      str = str.replace(/đ/g,"d");
+      str = str.replace(/À|Á|Ạ|Ả|Ã|Â|Ầ|Ấ|Ậ|Ẩ|Ẫ|Ă|Ằ|Ắ|Ặ|Ẳ|Ẵ/g, "A");
+      str = str.replace(/È|É|Ẹ|Ẻ|Ẽ|Ê|Ề|Ế|Ệ|Ể|Ễ/g, "E");
+      str = str.replace(/Ì|Í|Ị|Ỉ|Ĩ/g, "I");
+      str = str.replace(/Ò|Ó|Ọ|Ỏ|Õ|Ô|Ồ|Ố|Ộ|Ổ|Ỗ|Ơ|Ờ|Ớ|Ợ|Ở|Ỡ/g, "O");
+      str = str.replace(/Ù|Ú|Ụ|Ủ|Ũ|Ư|Ừ|Ứ|Ự|Ử|Ữ/g, "U");
+      str = str.replace(/Y|Ý|Ỵ|Ỷ|Ỹ/g, "Y");
+      str = str.replace(/Đ/g, "D");
+      // Combining accents
+      str = str.replace(/\u0300|\u0301|\u0309|\u0303|\u0323/g, ""); 
+      str = str.replace(/\u02C6|\u0306|\u031B/g, ""); 
+      return str;
+    }
+
+    // Advanced Vietnamese sorting helper (Sorts by Tên then Họ Đệm)
+    function getVietnameseSortKey(fullName) {
+      if (!fullName) return { firstName: "", lastName: "" };
+      const cleaned = fullName.trim().normalize('NFC');
+      const parts = cleaned.split(/\s+/);
+      const firstName = parts.pop() || ""; // Tên cuối cùng
+      const lastName = parts.join(" ");   // Phần họ và tên đệm
+      return { firstName, lastName };
+    }
+
+    function compareVietnameseNames(a, b) {
+      const compFirst = a.sortKey.firstName.localeCompare(b.sortKey.firstName, 'vi', { sensitivity: 'accent' });
+      if (compFirst !== 0) return compFirst;
+      return a.sortKey.lastName.localeCompare(b.sortKey.lastName, 'vi', { sensitivity: 'accent' });
+    }
+
+    // Highly optimized Batch key generator for Instant Search
+    function precalculateKeys(list) {
+      const len = list.length;
+      for (let i = 0; i < len; i++) {
+        const s = list[i];
+        s.sortKey = getVietnameseSortKey(s.name);
+        s.nameLower = s.name.normalize('NFC').toLowerCase();
+        s.nameClean = removeVietnameseTones(s.nameLower);
+        s.classLower = s.class.normalize('NFC').toLowerCase();
+        s.phoneClean = String(s.phone || '').trim();
+        s.phone2Clean = String(s.phone2 || '').trim();
+        s.grade = getGrade(s.class);
+      }
+    }
+
+    // Loader with customizable Percentage Display
+    function showProgressLoader(show, percent = 0, title = "Đang xử lý dữ liệu học sinh...", subtitle = "Vui lòng đợi giây lát") {
+      const overlay = document.getElementById('loading-overlay');
+      const percentText = document.getElementById('loading-percent');
+      const progressBar = document.getElementById('loading-progress-bar');
+      const titleText = document.getElementById('loading-title');
+      const subText = document.getElementById('loading-subtitle');
+      
+      if (show) {
+        overlay.classList.remove('hidden');
+        percentText.textContent = `${percent}%`;
+        progressBar.style.width = `${percent}%`;
+        titleText.textContent = title;
+        subText.textContent = subtitle;
+      } else {
+        overlay.classList.add('hidden');
+      }
+    }
+
+    // Populate standard dropdown selector options
+    function initGlobalDropdowns() {
+      // 1. Select week dropdowns (Week 1 to Week 37)
+      const selects = ['violation-week', 'log-filter-week'];
+      selects.forEach(id => {
+        const el = document.getElementById(id);
+        if (!el) return;
+        
+        // Save initial selection if in logs
+        const origVal = el.value;
+        el.innerHTML = id === 'log-filter-week' ? '<option value="all">Tất cả các tuần</option>' : '';
+        for (let w = 1; w <= 37; w++) {
+          const opt = document.createElement('option');
+          opt.value = w;
+          opt.textContent = `Tuần ${w}`;
+          el.appendChild(opt);
+        }
+        if (origVal) el.value = origVal;
+      });
+
+      // 2. Select rule dropdown in quick log modal
+      const ruleSelect = document.getElementById('violation-type-select');
+      if (ruleSelect) {
+        ruleSelect.innerHTML = '';
+        violationTypes.forEach(rule => {
+          const opt = document.createElement('option');
+          opt.value = rule.id;
+          opt.textContent = `[${rule.category}] ${rule.name} (-${rule.points}đ)`;
+          ruleSelect.appendChild(opt);
+        });
+      }
+    }
+
+    // Automatic calculation of school weeks from date
+    function calculateSchoolParams(dateStr) {
+      const d = new Date(dateStr);
+      if (isNaN(d)) return { week: 1, month: 9, semester: 'Học kỳ I' };
+      
+      const month = d.getMonth() + 1;
+      let semester = 'Học kỳ I';
+      if (month >= 1 && month <= 5) {
+        semester = 'Học kỳ II';
+      }
+      
+      const year = d.getFullYear();
+      let schoolStart = new Date(year, 8, 1); // standard Sep 1st
+      if (month < 8) {
+        schoolStart = new Date(year - 1, 8, 1);
+      }
+      
+      const diffTime = Math.abs(d - schoolStart);
+      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+      let week = Math.ceil(diffDays / 7);
+      if (week < 1) week = 1;
+      if (week > 37) week = 37;
+      
+      return { week, month, semester };
+    }
+
+    function onViolationDateChange(val) {
+      if (!val) return;
+      const params = calculateSchoolParams(val);
+      document.getElementById('violation-week').value = params.week;
+      document.getElementById('violation-month').value = params.month;
+      document.getElementById('violation-semester').value = params.semester;
+    }
+
+    // Populate dummy emulation state
+    function loadSampleData() {
+      showProgressLoader(true, 10, "Đang tải dữ liệu mẫu...", "Thiết lập danh sách học sinh");
+      
+      setTimeout(() => {
+        showProgressLoader(true, 40, "Đang tạo lập đối tượng mẫu...", "Thiết lập 12 học sinh chuẩn ban đầu");
+        students = [
+          { name: 'Nguyễn Thành Long', class: '6A1', gender: 'Nam', birthYear: '2014', phone: '0987123456', phone2: '0901234501', boarding: 'Có' },
+          { name: 'Trần Thị Thảo', class: '6A2', gender: 'Nữ', birthYear: '2014', phone: '0912345678', phone2: '0901234502', boarding: 'Không' },
+          { name: 'Lê Hoàng Minh', class: '7B1', gender: 'Nam', birthYear: '2013', phone: '0901234567', phone2: '0901234503', boarding: 'Có' },
+          { name: 'Phạm Hồng Đào', class: '7B2', gender: 'Nữ', birthYear: '2013', phone: '0868889991', phone2: '0901234504', boarding: 'Không' },
+          { name: 'Vũ Quốc Bảo', class: '8C1', gender: 'Nam', birthYear: '2012', phone: '0356789123', phone2: '0901234505', boarding: 'Có' },
+          { name: 'Đặng Mai Phương', class: '8C2', gender: 'Nữ', birthYear: '2012', phone: '0978665544', phone2: '0901234506', boarding: 'Có' },
+          { name: 'Bùi Thế Kiệt', class: '9D1', gender: 'Nam', birthYear: '2011', phone: '0981223344', phone2: '0901234507', boarding: 'Không' },
+          { name: 'Hoàng Ánh Nguyệt', class: '9D2', gender: 'Nữ', birthYear: '2011', phone: '0919887766', phone2: '0901234508', boarding: 'Có' },
+          { name: 'Nguyễn Thảo Nguyên', class: '6A1', gender: 'Nữ', birthYear: '2014', phone: '0899123321', phone2: '0901234509', boarding: 'Có' },
+          { name: 'Trịnh Khánh Vy', class: '7B1', gender: 'Nữ', birthYear: '2013', phone: '0344556677', phone2: '0901234510', boarding: 'Không' },
+          { name: 'Đỗ Tuấn Kiệt', class: '9D1', gender: 'Nam', birthYear: '2011', phone: '0922114433', phone2: '0901234511', boarding: 'Có' },
+          { name: 'Nguyễn Văn Thành', class: '6A1', gender: 'Nam', birthYear: '2014', phone: '0933556677', phone2: '0901234512', boarding: 'Không' }
+        ];
+
+        showProgressLoader(true, 70, "Tạo lập sổ tay lịch sử vi phạm mẫu...", "Tạo dựng dữ liệu thi đua minh họa");
+        
+        // Build mock violations for demonstration
+        const today = new Date();
+        const pastDate1 = new Date(today.getTime() - (2 * 24 * 60 * 60 * 1000)).toISOString().split('T')[0];
+        const pastDate2 = new Date(today.getTime() - (5 * 24 * 60 * 60 * 1000)).toISOString().split('T')[0];
+
+        violations = [
+          {
+            id: 'v_mock_1',
+            studentName: 'Nguyễn Thành Long',
+            studentClass: '6A1',
+            ruleId: 'rule_1',
+            ruleName: 'Đi học muộn (sau hồi trống báo)',
+            points: 2,
+            category: 'Chuyên cần',
+            date: pastDate1,
+            week: '10',
+            month: '10',
+            semester: 'Học kỳ I',
+            note: 'Muộn 10 phút, tự kiểm điểm trước lớp'
+          },
+          {
+            id: 'v_mock_2',
+            studentName: 'Vũ Quốc Bảo',
+            studentClass: '8C1',
+            ruleId: 'rule_5',
+            ruleName: 'Sử dụng điện thoại không phục vụ học tập',
+            points: 5,
+            category: 'Nề nếp',
+            date: pastDate2,
+            week: '10',
+            month: '10',
+            semester: 'Học kỳ I',
+            note: 'Chơi game trong tiết Toán'
+          },
+          {
+            id: 'v_mock_3',
+            studentName: 'Lê Hoàng Minh',
+            studentClass: '7B1',
+            ruleId: 'rule_3',
+            ruleName: 'Không học bài, chuẩn bị bài hoặc thiếu dụng cụ',
+            points: 2,
+            category: 'Học tập',
+            date: pastDate1,
+            week: '10',
+            month: '10',
+            semester: 'Học kỳ I',
+            note: 'Không soạn văn'
+          },
+          {
+            id: 'v_mock_4',
+            studentName: 'Nguyễn Thảo Nguyên',
+            studentClass: '6A1',
+            ruleId: 'rule_2',
+            ruleName: 'Không đeo khăn quàng / Phù hiệu / Bảng tên',
+            points: 1,
+            category: 'Đồng phục',
+            date: pastDate1,
+            week: '11',
+            month: '10',
+            semester: 'Học kỳ I',
+            note: 'Quên đeo thẻ học sinh'
+          }
+        ];
+
+        precalculateKeys(students);
+        
+        setTimeout(async () => {
+          const status = document.getElementById('import-status');
+          status.classList.remove('hidden');
+          status.innerHTML = `<i data-lucide="check" class="w-4 h-4 text-emerald-400"></i> Đã tải thành công <strong>${students.length} học sinh mẫu</strong> & <strong>${violations.length} kỷ luật thi đua mẫu</strong>!`;
+          
+          await saveAutosaveToCloud();
+          showPreview(true);
+          updateStats();
+          doSearch('');
+          initGlobalDropdowns();
+          onReportTargetChange();
+          renderRules();
+          renderViolationLogs();
+          showProgressLoader(false);
+          lucide.createIcons();
+          showToast('✓ Đã tải dữ liệu mẫu thành công!');
+        }, 150);
+      }, 200);
+    }
+
+    // Manual Download Backup of whole state as JSON file
+    function downloadBackup() {
+      if (students.length === 0 && violations.length === 0) {
+        showToast('❌ Không có dữ liệu để thực hiện sao lưu!');
+        return;
+      }
+      try {
+        const backupData = {
+          app: "Find_HS_Boarding_Emulation",
+          version: "3.0",
+          backupDate: new Date().toISOString(),
+          students: students.map(s => {
+            const { sortKey, nameLower, nameClean, classLower, phoneClean, phone2Clean, grade, ...rest } = s;
+            return rest;
+          }),
+          violations: violations,
+          violationTypes: violationTypes
+        };
+        const blob = new Blob([JSON.stringify(backupData, null, 2)], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `Backup_QuanLyThiDua_${new Date().toISOString().slice(0, 10)}.json`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+        showToast('✓ Tải file Sao lưu (.json) thành công!');
+      } catch (e) {
+        showToast('❌ Lỗi khi đóng gói bản sao lưu!');
+      }
+    }
+
+    // Manual Upload Restore from JSON file
+    function handleJsonRestore(e) {
+      const file = e.target.files[0];
+      if (!file) return;
+
+      showProgressLoader(true, 10, "Đang chuẩn bị phục hồi sao lưu...", "Đọc cấu trúc tệp dữ liệu");
+      const reader = new FileReader();
+      reader.onload = async (evt) => {
+        try {
+          const parsed = JSON.parse(evt.target.result);
+          if (parsed) {
+            showProgressLoader(true, 40, "Đang ánh xạ danh sách học sinh...", "Phân loại dữ liệu thi đua");
+            
+            if (Array.isArray(parsed.students)) {
+              students = parsed.students;
+              precalculateKeys(students);
+            }
+            if (Array.isArray(parsed.violationTypes)) {
+              violationTypes = parsed.violationTypes;
+            }
+            if (Array.isArray(parsed.violations)) {
+              violations = parsed.violations;
+            }
+            
+            showProgressLoader(true, 80, "Đang biên dịch lại khóa tìm kiếm...", "Tối ưu hóa bộ nhớ đệm");
+            
+            const status = document.getElementById('import-status');
+            status.classList.remove('hidden');
+            status.innerHTML = `<i data-lucide="check-check" class="w-4 h-4 text-emerald-400"></i> Đã phục hồi <strong>${students.length} học sinh</strong> & <strong>${violations.length} vi phạm</strong> thành công!`;
+            
+            await saveAutosaveToCloud();
+            showPreview(false);
+            updateStats();
+            doSearch('');
+            initGlobalDropdowns();
+            onReportTargetChange();
+            renderRules();
+            renderViolationLogs();
+            showProgressLoader(false);
+            lucide.createIcons();
+            showToast('✓ Khôi phục dữ liệu sao lưu thành công!');
+          } else {
+            showProgressLoader(false);
+            showToast('❌ Định dạng file sao lưu không hợp lệ!');
+          }
+        } catch (err) {
+          showProgressLoader(false);
+          showToast('❌ Không thể đọc file JSON!');
+        }
+      };
+      reader.readAsText(file);
+    }
+
+    // Safe deletion prompt using custom confirm modal
+    function clearAllDataPrompt() {
+      showConfirm(
+        'Xác nhận dọn sạch hệ thống',
+        'Cảnh báo: Thao tác này sẽ xóa toàn bộ Học sinh, Lịch sử vi phạm rèn luyện hiện có trên thiết bị và Đám mây. Bạn có chắc chắn không?',
+        async () => {
+          await clearData();
+        }
+      );
+    }
+
+    // Function to empty/clear all current student data safely
+    async function clearData() {
+      students = [];
+      violations = [];
+      currentWorkbook = null;
+      currentRows = [];
+      
+      // Reset file inputs
+      const fileInput = document.getElementById('file-input');
+      if (fileInput) fileInput.value = '';
+      const backupInput = document.getElementById('backup-input');
+      if (backupInput) backupInput.value = '';
+      
+      // Hide mapping, preview & status sections
+      document.getElementById('import-status').classList.add('hidden');
+      document.getElementById('mapping-card').classList.add('hidden');
+      document.getElementById('preview-section').classList.add('hidden');
+      
+      // Delete IndexedDB store
+      try {
+        await deleteLocalItem("autosave_state_emu");
+      } catch (e) {
+        console.warn(e);
+      }
+
+      await saveAutosaveToCloud(true); // Save with Clean status
+      
+      // Trigger GUI updates
+      updateStats();
+      doSearch('');
+      initGlobalDropdowns();
+      onReportTargetChange();
+      renderViolationLogs();
+      
+      showToast('✓ Đã dọn sạch dữ liệu! Bạn có thể nạp file mới.');
+    }
+
+    function switchTab(tab) {
+      ['import','search','rules','logs','report'].forEach(t => {
+        document.getElementById(`panel-${t}`).classList.toggle('hidden', t !== tab);
+        const btn = document.getElementById(`tab-${t}`);
+        if (btn) {
+          btn.classList.toggle('text-indigo-400', t === tab);
+          btn.classList.toggle('border-indigo-400', t === tab);
+          btn.classList.toggle('text-slate-400', t !== tab);
+          btn.classList.toggle('border-transparent', t !== tab);
+        }
+      });
+      if (tab === 'report') {
+        updateStats();
+        onReportTargetChange();
+      }
+      if (tab === 'search') {
+        currentGradeFilter = 0;
+        document.getElementById('search-input').value = '';
+        updateFilterButtons();
+        doSearch('');
+      }
+      if (tab === 'rules') {
+        renderRules();
+      }
+      if (tab === 'logs') {
+        renderViolationLogs();
+      }
+    }
+
+    // Load file and expose Sheets
+    function handleFile(e) {
+      const file = e.target.files[0];
+      if (!file) return;
+      
+      showProgressLoader(true, 10, "Đang kết nối tệp Excel...", "Đang phân tích cấu trúc cột");
+      const reader = new FileReader();
+      reader.onload = (evt) => {
+        try {
+          const wb = XLSX.read(evt.target.result, { type: 'binary' });
+          currentWorkbook = wb;
+          
+          const sheetSelector = document.getElementById('sheet-selector');
+          sheetSelector.innerHTML = '';
+          
+          wb.SheetNames.forEach(sheetName => {
+            const opt = document.createElement('option');
+            opt.value = sheetName;
+            opt.textContent = sheetName;
+            sheetSelector.appendChild(opt);
+          });
+          
+          document.getElementById('mapping-card').classList.remove('hidden');
+          onSheetSelected();
+          showProgressLoader(false);
+          showToast('✓ Đọc tệp Excel thành công!');
+        } catch (err) {
+          showProgressLoader(false);
+          showToast('❌ Lỗi định dạng tệp Excel không hợp lệ!');
+          console.error(err);
+        }
+      };
+      reader.readAsBinaryString(file);
+    }
+
+    // Triggered when selected sheet changes
+    function onSheetSelected() {
+      if (!currentWorkbook) return;
+      const sheetSelector = document.getElementById('sheet-selector');
+      const ws = currentWorkbook.Sheets[sheetSelector.value];
+      const rows = XLSX.utils.sheet_to_json(ws, { header: 1 });
+      
+      currentRows = rows;
+      if (rows.length === 0) {
+        showToast('⚠ Sheet đã chọn không chứa bất kỳ dữ liệu nào!');
+        return;
+      }
+      
+      const headers = rows[0] || [];
+      const mappingSelects = ['map-name', 'map-class', 'map-gender', 'map-birth', 'map-phone', 'map-phone2', 'map-boarding'];
+      
+      // Setup options
+      mappingSelects.forEach(selId => {
+        const sel = document.getElementById(selId);
+        sel.innerHTML = '<option value="-1">-- Không có / Bỏ qua --</option>';
+        headers.forEach((h, idx) => {
+          const option = document.createElement('option');
+          option.value = idx;
+          option.textContent = `Cột ${getColumnName(idx)}: "${String(h).trim()}"`;
+          sel.appendChild(option);
+        });
+      });
+
+      // Smart Matching Column Title Predictor
+      autoGuessColumns(headers);
+    }
+
+    function getColumnName(index) {
+      let label = "";
+      while (index >= 0) {
+        label = String.fromCharCode((index % 26) + 65) + label;
+        index = Math.floor(index / 26) - 1;
+      }
+      return label;
+    }
+
+    // Auto smart predictor
+    function autoGuessColumns(headers) {
+      const mappings = {
+        'map-name': ['tên', 'họ tên', 'hoten', 'ho ten', 'name', 'học sinh', 'hoc sinh', 'fullname'],
+        'map-class': ['lớp', 'lop', 'class', 'mã lớp', 'malop'],
+        'map-gender': ['giới tính', 'gioitinh', 'gioi tinh', 'nam/nữ', 'nam/nu', 'gender', 'phái', 'phai'],
+        'map-birth': ['năm sinh', 'nam sinh', 'namsinh', 'birth', 'ngày sinh', 'ngay sinh', 'yob'],
+        'map-phone': ['sđt', 'sdt', 'điện thoại', 'dien thoai', 'phone', 'liên hệ', 'tel', 'sđt 1', 'sđt chính'],
+        'map-phone2': ['sđt 2', 'sđt dự phòng', 'sđt dp', 'điện thoại dự phòng', 'phone 2', 'sđt phụ', 'sdt2'],
+        'map-boarding': ['bán trú', 'ban tru', 'boarding', 'đăng ký bán trú', 'ăn bán trú', 'bantru']
+      };
+
+      for (let key in mappings) {
+        const sel = document.getElementById(key);
+        let foundIdx = -1;
+        
+        for (let i = 0; i < headers.length; i++) {
+          const title = String(headers[i] || '').toLowerCase().trim();
+          if (mappings[key].some(keyword => title.includes(keyword))) {
+            foundIdx = i;
+            break;
+          }
+        }
+        
+        if (foundIdx !== -1) {
+          sel.value = foundIdx;
+        } else {
+          // Defaults
+          if (key === 'map-name') sel.value = 0;
+          else if (key === 'map-class') sel.value = 1;
+          else if (key === 'map-gender') sel.value = 2;
+          else if (key === 'map-birth') sel.value = 3;
+          else if (key === 'map-phone') sel.value = 4;
+          else if (key === 'map-phone2') sel.value = -1; 
+          else if (key === 'map-boarding') sel.value = -1; 
+        }
+      }
+    }
+
+    // Map Column to Student Array (Chunked Importer)
+    function confirmImport() {
+      if (currentRows.length < 2) {
+        showToast('⚠ Dữ liệu quá ngắn để phân tích!');
+        return;
+      }
+
+      const mapName = parseInt(document.getElementById('map-name').value);
+      const mapClass = parseInt(document.getElementById('map-class').value);
+      const mapGender = parseInt(document.getElementById('map-gender').value);
+      const mapBirth = parseInt(document.getElementById('map-birth').value);
+      const mapPhone = parseInt(document.getElementById('map-phone').value);
+      const mapPhone2 = parseInt(document.getElementById('map-phone2').value);
+      const mapBoarding = parseInt(document.getElementById('map-boarding').value);
+
+      if (mapName === -1 || mapClass === -1) {
+        showToast('❌ Bắt buộc phải ánh xạ cột "Họ và tên" và "Lớp học"!');
+        return;
+      }
+
+      students = [];
+      const totalRows = currentRows.length - 1;
+      let currentIndex = 1;
+      const chunkSize = 200; 
+
+      showProgressLoader(true, 0, "Bắt đầu phân tích Excel...", `Tổng số hàng: ${totalRows}`);
+
+      function importChunk() {
+        const endLimit = Math.min(currentIndex + chunkSize, currentRows.length);
+        
+        for (let i = currentIndex; i < endLimit; i++) {
+          const r = currentRows[i];
+          if (!r || r.length === 0) continue;
+          
+          const name = mapName !== -1 && r[mapName] !== undefined ? String(r[mapName]).trim() : '';
+          const cls = mapClass !== -1 && r[mapClass] !== undefined ? String(r[mapClass]).trim() : '';
+          
+          if (!name && !cls) continue;
+
+          const gender = mapGender !== -1 && r[mapGender] !== undefined ? String(r[mapGender]).trim() : 'N/A';
+          const birthYear = mapBirth !== -1 && r[mapBirth] !== undefined ? String(r[mapBirth]).trim() : 'N/A';
+          const phone = mapPhone !== -1 && r[mapPhone] !== undefined ? String(r[mapPhone]).trim() : 'N/A';
+          const phone2 = mapPhone2 !== -1 && r[mapPhone2] !== undefined ? String(r[mapPhone2]).trim() : 'N/A';
+          
+          let boarding = 'Không';
+          if (mapBoarding !== -1 && r[mapBoarding] !== undefined) {
+            const rawBoarding = String(r[mapBoarding]).trim().toLowerCase();
+            if (['có', 'co', 'yes', 'y', 'x', '1', 'true', 'bán trú', 'ban tru'].includes(rawBoarding)) {
+              boarding = 'Có';
+            } else if (rawBoarding && rawBoarding !== 'không' && rawBoarding !== 'khong' && rawBoarding !== 'no' && rawBoarding !== '0' && rawBoarding !== 'false') {
+              boarding = String(r[mapBoarding]).trim();
+            }
+          }
+
+          students.push({ name, class: cls, gender, birthYear, phone, phone2, boarding });
+        }
+
+        currentIndex = endLimit;
+        const progressPercent = Math.round(((currentIndex - 1) / totalRows) * 100);
+        
+        showProgressLoader(true, progressPercent, `Đang nạp dữ liệu... (${currentIndex - 1}/${totalRows})`, `Tốc độ tối ưu hóa phân khúc tránh lag`);
+
+        if (currentIndex < currentRows.length) {
+          setTimeout(importChunk, 1);
+        } else {
+          showProgressLoader(true, 95, "Biên dịch chỉ mục tìm kiếm...", "Tối ưu hóa bộ nhớ đệm giúp tìm kiếm siêu tốc");
+          
+          setTimeout(async () => {
+            precalculateKeys(students);
+            
+            const status = document.getElementById('import-status');
+            status.classList.remove('hidden');
+            status.innerHTML = `<i data-lucide="check" class="w-4 h-4 text-emerald-400"></i> Đã nạp thành công <strong>${students.length} học sinh</strong> từ file của bạn!`;
+            
+            await saveAutosaveToCloud();
+            showPreview(false);
+            updateStats();
+            doSearch('');
+            onReportTargetChange();
+            showProgressLoader(false);
+            lucide.createIcons();
+            showToast('✓ Đồng bộ dữ liệu thành công!');
+          }, 50);
+        }
+      }
+
+      setTimeout(importChunk, 1);
+    }
+
+    function getGrade(cls) {
+      const m = String(cls).match(/(\d+)/);
+      return m ? parseInt(m[1]) : 0;
+    }
+
+    function gradeClass(cls) {
+      const g = getGrade(cls);
+      if (g === 6) return 'grade-6';
+      if (g === 7) return 'grade-7';
+      if (g === 8) return 'grade-8';
+      if (g === 9) return 'grade-9';
+      return 'bg-slate-700 text-slate-200 border-l-4 border-slate-500';
+    }
+
+    function showPreview(isSample = false) {
+      const section = document.getElementById('preview-section');
+      const list = document.getElementById('preview-list');
+      section.classList.remove('hidden');
+      
+      list.innerHTML = students.slice(0, 5).map(s => `
+        <div class="${gradeClass(s.class)} rounded-lg p-3 text-slate-900 shadow-md">
+          <div class="font-bold truncate text-sm">${s.name}</div>
+          <div class="text-xs opacity-90 mt-1">Lớp: ${s.class} | Bán trú: ${s.boarding || 'Không'}</div>
+          <div class="text-2xs opacity-75 mt-0.5 truncate">SĐT 1: ${s.phone}</div>
+        </div>
+      `).join('');
+
+      if (students.length > 5) {
+        const moreDiv = document.createElement('div');
+        moreDiv.className = 'col-span-1 md:col-span-2 lg:col-span-5 text-center py-2 bg-slate-800 rounded-lg text-slate-400 text-xs border border-slate-700';
+        moreDiv.textContent = `... và ${students.length - 5} học sinh khác đã được nạp thành công.`;
+        list.appendChild(moreDiv);
+      }
+      lucide.createIcons();
+    }
+
+    // Filtering Grades in Search
+    function filterGrade(grade) {
+      currentGradeFilter = grade;
+      updateFilterButtons();
+      doSearch(document.getElementById('search-input').value);
+    }
+
+    function updateFilterButtons() {
+      for (let g of [0, 6, 7, 8, 9]) {
+        const btn = document.getElementById(`filter-${g}`);
+        if (!btn) continue;
+        if (currentGradeFilter === g) {
+          btn.classList.remove('bg-slate-800', 'text-slate-300', 'hover:bg-sky-600/30', 'hover:bg-emerald-600/30', 'hover:bg-amber-600/30', 'hover:bg-pink-600/30');
+          if (g === 0) btn.classList.add('bg-indigo-600', 'text-white');
+          else if (g === 6) btn.classList.add('bg-sky-600', 'text-white');
+          else if (g === 7) btn.classList.add('bg-emerald-600', 'text-white');
+          else if (g === 8) btn.classList.add('bg-amber-600', 'text-white');
+          else if (g === 9) btn.classList.add('bg-pink-600', 'text-white');
+        } else {
+          btn.classList.remove('bg-sky-600', 'bg-emerald-600', 'bg-amber-600', 'bg-pink-600', 'bg-indigo-600', 'text-white');
+          btn.classList.add('bg-slate-800', 'text-slate-300');
+        }
+      }
+    }
+
+    // High performance accented + non-accented lookup 
+    function onSearchInput(val) {
+      searchLimit = 40; 
+      doSearch(val);
+    }
+
+    function showMoreSearchResults() {
+      searchLimit += 40; 
+      doSearch(document.getElementById('search-input').value);
+    }
+
+    function doSearch(q) {
+      const originalQuery = q.trim().normalize('NFC');
+      const lowerQuery = originalQuery.toLowerCase();
+      const toneRemovedQuery = removeVietnameseTones(lowerQuery);
+      
+      const fontAwesomePatch = document.getElementById('search-results');
+      const count = document.getElementById('search-count');
+      const loadMoreBtn = document.getElementById('search-more-container');
+      
+      if (students.length === 0) {
+        count.innerHTML = '<span class="text-rose-400 flex items-center gap-1"><i data-lucide="info" class="w-4 h-4"></i> Hệ thống trống. Hãy nạp file Excel hoặc khôi phục sao lưu!</span>';
+        fontAwesomePatch.innerHTML = '';
+        loadMoreBtn.classList.add('hidden');
+        lucide.createIcons();
+        return;
+      }
+
+      filteredCache = students.filter(s => {
+        if (!originalQuery) {
+          return currentGradeFilter === 0 || s.grade === currentGradeFilter;
+        }
+
+        const matchName = s.nameLower.includes(lowerQuery) || s.nameClean.includes(toneRemovedQuery);
+        const matchClass = s.classLower.includes(lowerQuery);
+        const matchPhone = s.phoneClean.includes(lowerQuery) || s.phone2Clean.includes(lowerQuery);
+
+        const matchSearch = matchName || matchClass || matchPhone;
+        const matchGrade = currentGradeFilter === 0 || s.grade === currentGradeFilter;
+
+        return matchSearch && matchGrade;
+      });
+
+      if (filteredCache.length === 0) {
+        count.textContent = originalQuery ? 'Không tìm thấy học sinh phù hợp!' : 'Chọn khối để hiển thị';
+        fontAwesomePatch.innerHTML = `
+          <div class="col-span-full py-12 text-center text-slate-500 space-y-2">
+            <i data-lucide="search-code" class="w-12 h-12 mx-auto text-slate-600"></i>
+            <p class="font-semibold text-slate-400">Không tìm thấy kết quả trùng khớp với "${originalQuery}"</p>
+            <p class="text-xs text-slate-500">Mẹo: Hệ thống hỗ trợ tìm kiếm không dấu lẫn có dấu tự động!</p>
+          </div>
+        `;
+        loadMoreBtn.classList.add('hidden');
+        lucide.createIcons();
+        return;
+      }
+
+      // Sort by Grade -> Class -> Name
+      filteredCache.sort((a, b) => {
+        if (a.grade !== b.grade) return a.grade - b.grade;
+        
+        const classComp = a.class.localeCompare(b.class, 'vi', { numeric: true });
+        if (classComp !== 0) return classComp;
+        
+        return compareVietnameseNames(a, b);
+      });
+
+      count.textContent = `Tìm thấy ${filteredCache.length} học sinh phù hợp`;
+
+      const paginated = filteredCache.slice(0, searchLimit);
+      
+      if (filteredCache.length > searchLimit) {
+        loadMoreBtn.classList.remove('hidden');
+      } else {
+        loadMoreBtn.classList.add('hidden');
+      }
+      
+      fontAwesomePatch.innerHTML = paginated.map((s) => {
+        const realIdx = students.indexOf(s);
+        
+        // Highlight logic
+        let highlightedName = s.name;
+        if (originalQuery) {
+          let matchIndex = s.nameLower.indexOf(lowerQuery);
+          let matchLen = lowerQuery.length;
+          
+          if (matchIndex === -1) {
+            matchIndex = s.nameClean.indexOf(toneRemovedQuery);
+            matchLen = toneRemovedQuery.length;
+          }
+
+          if (matchIndex !== -1) {
+            const rawMatch = s.name.substr(matchIndex, matchLen);
+            highlightedName = s.name.substring(0, matchIndex) + 
+                              `<span class="bg-yellow-300 text-slate-900 rounded px-0.5 font-bold">${rawMatch}</span>` + 
+                              s.name.substring(matchIndex + matchLen);
+          }
+        }
+
+        // Compute total violation points deducted for this student
+        const studentViolations = violations.filter(v => v.studentName === s.name && v.studentClass === s.class);
+        const totalDeducted = studentViolations.reduce((sum, v) => sum + parseFloat(v.points || 0), 0);
+
+        return `
+        <div class="${gradeClass(s.class)} rounded-xl p-4 text-slate-900 transition-all hover:shadow-lg hover:scale-[1.01] flex items-center justify-between">
+          <div class="flex-1 min-w-0" onclick="showDetail(${realIdx})">
+            <div class="flex items-center gap-2">
+              <div class="font-bold text-base truncate flex-1">${highlightedName}</div>
+              ${s.boarding === 'Có' ? `<span class="bg-emerald-500 text-white text-[9px] font-extrabold px-1.5 py-0.5 rounded uppercase">Bán Trú</span>` : ''}
+              ${totalDeducted > 0 ? `<span class="bg-rose-500 text-white text-[9px] font-bold px-1.5 py-0.5 rounded uppercase">- ${totalDeducted}đ</span>` : ''}
+            </div>
+            <div class="text-xs opacity-90 mt-1.5 grid grid-cols-2 gap-y-1">
+              <span>Lớp: <strong class="text-slate-950 font-bold">${s.class}</strong></span>
+              <span>Giới tính: <strong>${s.gender}</strong></span>
+              <span class="col-span-2 truncate">SĐT: <strong>${s.phone}</strong></span>
+            </div>
+          </div>
+          <div class="flex flex-col gap-1 ml-2 shrink-0">
+            <button onclick="openViolationModal(${realIdx})" class="bg-red-600 hover:bg-red-500 text-white px-2.5 py-1.5 rounded-lg text-2xs font-extrabold flex items-center gap-1 shadow transition active:scale-95">
+              <i data-lucide="shield-alert" class="w-3.5 h-3.5"></i> Phạt lỗi
+            </button>
+            <button onclick="showDetail(${realIdx})" class="border border-slate-700/20 bg-slate-900/10 hover:bg-slate-900/20 text-slate-800 px-2.5 py-1.5 rounded-lg text-2xs font-bold transition active:scale-95 text-center">
+              Chi tiết
+            </button>
+          </div>
+        </div>
+      `;
+      }).join('');
+      lucide.createIcons();
+    }
+
+    // Violation logging trigger
+    let activeStudentIndex = null;
+    function openViolationModal(idx) {
+      activeStudentIndex = idx;
+      const s = students[idx];
+      
+      document.getElementById('violation-target-name').textContent = s.name;
+      document.getElementById('violation-target-class').textContent = s.class;
+      
+      // Khắc phục lỗi lệch ngày do múi giờ bằng cách bù giờ timezone chuẩn cục bộ
+      const localDate = new Date();
+      const tzOffset = localDate.getTimezoneOffset() * 60000;
+      const localToday = new Date(localDate.getTime() - tzOffset);
+      const todayStr = localToday.toISOString().split('T')[0];
+      
+      document.getElementById('violation-date').value = todayStr;
+      document.getElementById('violation-note').value = '';
+      
+      onViolationDateChange(todayStr);
+      document.getElementById('violation-modal').classList.remove('hidden');
+    }
+
+    function closeViolationModal() {
+      document.getElementById('violation-modal').classList.add('hidden');
+      activeStudentIndex = null;
+    }
+
+    // Save student infraction
+    async function saveStudentViolation() {
+      if (activeStudentIndex === null) return;
+      
+      const s = students[activeStudentIndex];
+      const ruleId = document.getElementById('violation-type-select').value;
+      const rule = violationTypes.find(r => r.id === ruleId);
+      
+      if (!rule) {
+        showToast('❌ Sai quy tắc lỗi vi phạm!');
+        return;
+      }
+
+      const dateStr = document.getElementById('violation-date').value;
+      if (!dateStr) {
+        showToast('❌ Vui lòng nhập ngày vi phạm!');
+        return;
+      }
+
+      const weekVal = document.getElementById('violation-week').value;
+      const monthVal = document.getElementById('violation-month').value;
+      const semVal = document.getElementById('violation-semester').value;
+      const noteVal = document.getElementById('violation-note').value.trim();
+
+      const newViolation = {
+        id: 'v_' + Date.now() + '_' + Math.random().toString(36).substr(2, 4),
+        studentName: s.name,
+        studentClass: s.class,
+        ruleId: rule.id,
+        ruleName: rule.name,
+        points: rule.points,
+        category: rule.category,
+        date: dateStr,
+        week: String(weekVal),
+        month: String(monthVal),
+        semester: semVal,
+        note: noteVal
+      };
+
+      violations.push(newViolation);
+      await saveAutosaveToCloud();
+      
+      closeViolationModal();
+      showToast('✓ Đã ghi sổ vi phạm của học sinh!');
+      
+      // Update và đồng bộ hiển thị báo cáo in tức thì
+      doSearch(document.getElementById('search-input').value);
+      updateStats();
+      renderViolationLogs();
+      generateReportPreview();
+    }
+
+    // View detailed Student Ledger with personalized history
+    function showDetail(idx) {
+      const s = students[idx];
+      document.getElementById('detail-modal').classList.remove('hidden');
+      
+      const gradeNum = s.grade || getGrade(s.class);
+      const gradeColors = {
+        6: 'from-sky-500 to-sky-600',
+        7: 'from-emerald-500 to-emerald-600',
+        8: 'from-amber-500 to-amber-600',
+        9: 'from-pink-500 to-pink-600'
+      };
+      const gradeBg = gradeColors[gradeNum] || 'from-slate-600 to-slate-700';
+
+      // Gather history
+      const studentHist = violations.filter(v => v.studentName === s.name && v.studentClass === s.class);
+      const totalPoints = studentHist.reduce((sum, v) => sum + parseFloat(v.points || 0), 0);
+      
+      let historyHtml = `
+        <div class="text-xs text-slate-500 italic py-4 text-center">Gương mẫu rèn luyện tốt, chưa có lỗi vi phạm.</div>
+      `;
+      
+      if (studentHist.length > 0) {
+        studentHist.sort((a,b) => new Date(b.date) - new Date(a.date));
+        historyHtml = studentHist.map(v => `
+          <div class="bg-slate-900/40 p-2.5 rounded border border-red-500/10 space-y-1 text-2xs">
+            <div class="flex justify-between items-start">
+              <span class="font-bold text-red-400 truncate">${v.ruleName}</span>
+              <span class="bg-red-950/60 text-red-400 font-extrabold px-1.5 py-0.5 rounded text-[9px] shrink-0">- ${v.points}đ</span>
+            </div>
+            <div class="text-slate-500 flex justify-between">
+              <span>Ngày: ${new Date(v.date).toLocaleDateString('vi-VN')} (${v.semester} - Tuần ${v.week})</span>
+              <span>Chuyên đề: ${v.category}</span>
+            </div>
+            ${v.note ? `<div class="text-slate-400 border-l border-slate-700 pl-2 mt-1 italic">Ghi chú: ${v.note}</div>` : ''}
+          </div>
+        `).join('');
+      }
+      
+      document.getElementById('detail-content').innerHTML = `
+        <div class="bg-gradient-to-r ${gradeBg} rounded-xl p-5 text-white -mx-6 -mt-6 mb-4 shadow-inner">
+          <div class="text-xs opacity-80 font-semibold tracking-wider uppercase">Thẻ thông tin rèn luyện học sinh</div>
+          <div class="text-2xl font-bold mt-1.5 truncate">${s.name}</div>
+          <div class="text-xs opacity-90 mt-1 bg-black/20 inline-block px-2.5 py-0.5 rounded-full">Khối ${gradeNum ? gradeNum : 'Khác'} - Lớp ${s.class}</div>
+        </div>
+        
+        <div class="space-y-1.5 text-xs text-slate-300">
+          <div class="flex justify-between items-center py-2 border-b border-slate-700/60">
+            <span class="text-slate-400 flex items-center gap-2"><i data-lucide="id-card" class="w-4 h-4"></i> Lớp học</span>
+            <span class="font-bold text-slate-100">${s.class}</span>
+          </div>
+          <div class="flex justify-between items-center py-2 border-b border-slate-700/60">
+            <span class="text-slate-400 flex items-center gap-2"><i data-lucide="user" class="w-4 h-4"></i> Giới tính</span>
+            <span class="font-bold text-slate-100">${s.gender}</span>
+          </div>
+          <div class="flex justify-between items-center py-2 border-b border-slate-700/60">
+            <span class="text-slate-400 flex items-center gap-2"><i data-lucide="calendar" class="w-4 h-4"></i> Năm sinh</span>
+            <span class="font-bold text-slate-100">${s.birthYear}</span>
+          </div>
+          <div class="flex justify-between items-center py-2 border-b border-slate-700/60">
+            <span class="text-slate-400 flex items-center gap-2"><i data-lucide="phone" class="w-4 h-4"></i> Số điện thoại 1</span>
+            <span class="font-bold text-slate-100">${s.phone}</span>
+          </div>
+          <div class="flex justify-between items-center py-2 border-b border-slate-700/60">
+            <span class="text-slate-400 flex items-center gap-2 text-indigo-400"><i data-lucide="phone-call" class="w-4 h-4"></i> SĐT 2 (Dự phòng)</span>
+            <span class="font-bold text-indigo-300">${s.phone2 || 'Không có'}</span>
+          </div>
+          <div class="flex justify-between items-center py-2 border-b border-slate-700/60">
+            <span class="text-slate-400 flex items-center gap-2 text-emerald-400"><i data-lucide="home" class="w-4 h-4"></i> Trạng thái Bán trú</span>
+            <span class="font-bold ${s.boarding === 'Có' ? 'text-emerald-400' : 'text-rose-400'}">${s.boarding || 'Không'}</span>
+          </div>
+          <div class="flex justify-between items-center py-2.5">
+            <span class="text-slate-400 flex items-center gap-2 text-red-400"><i data-lucide="award" class="w-4 h-4"></i> Thi đua rèn luyện</span>
+            <span class="font-bold text-red-400 bg-red-950/40 px-3 py-1 border border-red-500/20 rounded-lg">Tổng điểm trừ: ${totalPoints}đ</span>
+          </div>
+        </div>
+
+        <!-- Scrollable Infractions ledger -->
+        <div class="mt-4 pt-3 border-t border-slate-700 space-y-2">
+          <div class="flex justify-between items-center">
+            <h4 class="font-bold text-xs text-slate-300">Nhật ký vi phạm đã ghi nhận</h4>
+            <button onclick="closeDetail(); openViolationModal(${idx});" class="bg-red-900/40 border border-red-500/30 hover:bg-red-800/40 text-red-300 text-3xs font-extrabold uppercase tracking-wide px-2 py-1 rounded">
+              + Ghi lỗi nhanh
+            </button>
+          </div>
+          <div class="max-h-40 overflow-y-auto space-y-1.5 scrollbar-thin">
+            ${historyHtml}
+          </div>
+        </div>
+      `;
+      lucide.createIcons();
+    }
+
+    function closeDetail() {
+      document.getElementById('detail-modal').classList.add('hidden');
+    }
+
+    // ----------------------------------------------------
+    // RULES MANAGEMENT PANEL ENGINE (NEW)
+    // ----------------------------------------------------
+    function renderRules() {
+      const tbody = document.getElementById('rules-table-body');
+      const badge = document.getElementById('rules-count-badge');
+      
+      badge.textContent = `${violationTypes.length} lỗi`;
+      tbody.innerHTML = violationTypes.map(rule => `
+        <tr class="hover:bg-slate-700/30">
+          <td class="py-2.5 px-2">
+            <span class="bg-slate-900 text-slate-400 text-3xs font-bold px-2 py-0.5 rounded border border-slate-700">${rule.category}</span>
+          </td>
+          <td class="py-2.5 px-2 font-semibold text-slate-100">${rule.name}</td>
+          <td class="py-2.5 px-2 text-center">
+            <span class="text-red-400 font-extrabold text-xs">-${rule.points}đ</span>
+          </td>
+          <td class="py-2.5 px-2 text-center">
+            <div class="flex justify-center gap-1.5">
+              <button onclick="editRulePrompt('${rule.id}')" class="p-1 rounded bg-slate-900 hover:bg-slate-700 text-sky-400 transition" title="Sửa">
+                <i data-lucide="edit" class="w-3.5 h-3.5"></i>
+              </button>
+              <button onclick="deleteRulePrompt('${rule.id}')" class="p-1 rounded bg-slate-900 hover:bg-rose-950/50 text-rose-500 transition" title="Xóa">
+                <i data-lucide="trash" class="w-3.5 h-3.5"></i>
+              </button>
+            </div>
+          </td>
+        </tr>
+      `).join('');
+      lucide.createIcons();
+    }
+
+    function editRulePrompt(id) {
+      const rule = violationTypes.find(r => r.id === id);
+      if (!rule) return;
+
+      document.getElementById('edit-rule-id').value = rule.id;
+      document.getElementById('rule-name-input').value = rule.name;
+      document.getElementById('rule-points-input').value = rule.points;
+      document.getElementById('rule-category-input').value = rule.category;
+
+      document.getElementById('rule-form-title').innerHTML = `<i data-lucide="edit-3" class="w-4 h-4 text-sky-400"></i> Hiệu chỉnh lỗi vi phạm`;
+      document.getElementById('rule-cancel-btn').classList.remove('hidden');
+      lucide.createIcons();
+    }
+
+    function resetRuleForm() {
+      document.getElementById('edit-rule-id').value = '';
+      document.getElementById('rule-name-input').value = '';
+      document.getElementById('rule-points-input').value = '';
+      document.getElementById('rule-category-input').value = 'Nề nếp';
+
+      document.getElementById('rule-form-title').innerHTML = `<i data-lucide="plus-circle" class="w-4 h-4 text-emerald-400"></i> Thêm lỗi vi phạm mới`;
+      document.getElementById('rule-cancel-btn').classList.add('hidden');
+      lucide.createIcons();
+    }
+
+    async function saveRule() {
+      const name = document.getElementById('rule-name-input').value.trim();
+      const points = parseFloat(document.getElementById('rule-points-input').value);
+      const category = document.getElementById('rule-category-input').value;
+      const editId = document.getElementById('edit-rule-id').value;
+
+      if (!name || isNaN(points)) {
+        showToast('❌ Vui lòng nhập đầy đủ Tên lỗi và Điểm trừ!');
+        return;
+      }
+
+      if (editId) {
+        // Edit mode
+        const ruleIdx = violationTypes.findIndex(r => r.id === editId);
+        if (ruleIdx !== -1) {
+          violationTypes[ruleIdx].name = name;
+          violationTypes[ruleIdx].points = points;
+          violationTypes[ruleIdx].category = category;
+          showToast('✓ Đã cập nhật định nghĩa lỗi!');
+        }
+      } else {
+        // Create mode
+        const newRule = {
+          id: 'rule_' + Date.now(),
+          name: name,
+          points: points,
+          category: category
+        };
+        violationTypes.push(newRule);
+        showToast('✓ Đã thêm quy chế lỗi vi phạm mới!');
+      }
+
+      await saveAutosaveToCloud();
+      resetRuleForm();
+      initGlobalDropdowns();
+      renderRules();
+      generateReportPreview();
+    }
+
+    function deleteRulePrompt(id) {
+      const rule = violationTypes.find(r => r.id === id);
+      if (!rule) return;
+
+      showConfirm(
+        'Xóa quy định lỗi',
+        `Xóa lỗi: "${rule.name}"? Việc này không ảnh hưởng đến các vi phạm cũ đã ghi vào sổ rèn luyện.`,
+        async () => {
+          violationTypes = violationTypes.filter(r => r.id !== id);
+          await saveAutosaveToCloud();
+          initGlobalDropdowns();
+          renderRules();
+          generateReportPreview();
+          showToast('✓ Đã xóa quy định lỗi thành công!');
+        }
+      );
+    }
+
+    // ----------------------------------------------------
+    // VIOLATION LEDGER LOGS TAB ENGINE (NEW)
+    // ----------------------------------------------------
+    function renderViolationLogs() {
+      const tbody = document.getElementById('logs-table-body');
+      const emptyView = document.getElementById('logs-empty-view');
+      const filterWeek = document.getElementById('log-filter-week').value;
+      const searchQ = document.getElementById('log-search-input').value.trim().toLowerCase();
+      const normSearch = removeVietnameseTones(searchQ);
+
+      let filteredLogs = violations.filter(v => {
+        const matchWeek = (filterWeek === 'all') || (v.week === filterWeek);
+        const matchText = (v.studentName.toLowerCase().includes(searchQ) || 
+                           v.studentClass.toLowerCase().includes(searchQ) ||
+                           removeVietnameseTones(v.studentName.toLowerCase()).includes(normSearch) ||
+                           v.ruleName.toLowerCase().includes(searchQ));
+        return matchWeek && matchText;
+      });
+
+      // Sort by newest date
+      filteredLogs.sort((a,b) => new Date(b.date) - new Date(a.date));
+
+      if (filteredLogs.length === 0) {
+        tbody.innerHTML = '';
+        emptyView.classList.remove('hidden');
+        return;
+      }
+      emptyView.classList.add('hidden');
+
+      tbody.innerHTML = filteredLogs.map(v => `
+        <tr class="hover:bg-slate-700/30">
+          <td class="py-3 px-2 text-slate-400 text-2xs font-mono">
+            ${new Date(v.date).toLocaleDateString('vi-VN')}<br>
+            <span class="text-indigo-400">T. ${v.week} • ${v.semester}</span>
+          </td>
+          <td class="py-3 px-2 font-bold text-slate-100">${v.studentName}</td>
+          <td class="py-3 px-2 text-center">
+            <span class="bg-indigo-950 text-indigo-300 font-bold px-2 py-0.5 rounded border border-indigo-900/30 text-[10px]">${v.studentClass}</span>
+          </td>
+          <td class="py-3 px-2 font-medium text-red-300">${v.ruleName}</td>
+          <td class="py-3 px-2 text-center text-red-400 font-extrabold">-${v.points}đ</td>
+          <td class="py-3 px-2 text-center">
+            <span class="bg-slate-900 text-slate-400 text-3xs font-bold px-1.5 py-0.5 rounded border border-slate-700">${v.category}</span>
+          </td>
+          <td class="py-3 px-2 text-slate-400 italic text-2xs truncate max-w-[120px]" title="${v.note || ''}">${v.note || '-'}</td>
+          <td class="py-3 px-2 text-center">
+            <button onclick="deleteViolationLogPrompt('${v.id}')" class="p-1 rounded bg-slate-900 hover:bg-rose-950/40 text-rose-500 transition" title="Xóa ghi chép">
+              <i data-lucide="trash" class="w-3.5 h-3.5"></i>
+            </button>
+          </td>
+        </tr>
+      `).join('');
+      lucide.createIcons();
+    }
+
+    function deleteViolationLogPrompt(id) {
+      showConfirm(
+        'Xóa bản ghi lỗi',
+        'Xóa bản ghi vi phạm này khỏi sổ rèn luyện học sinh và khôi phục điểm thi đua?',
+        async () => {
+          violations = violations.filter(v => v.id !== id);
+          await saveAutosaveToCloud();
+          renderViolationLogs();
+          updateStats();
+          generateReportPreview(); // Làm mới hiển thị bản in
+          showToast('✓ Đã xóa bản ghi vi phạm!');
+        }
+      );
+    }
+
+    // ----------------------------------------------------
+    // ANALYTICAL STATS ENGINE
+    // ----------------------------------------------------
+    function updateStats() {
+      const grades = [6,7,8,9];
+      const colors = ['bg-sky-600','bg-emerald-600','bg-amber-600','bg-pink-600'];
+      
+      const statsPanel = document.getElementById('stats');
+      statsPanel.innerHTML = grades.map((g,i) => {
+        const c = students.filter(s => (s.grade || getGrade(s.class)) === g).length;
+        return `
+          <div class="${colors[i]} rounded-xl p-4 text-center hover:scale-[1.03] transition-all shadow-md">
+            <div class="text-3xl font-black">${c}</div>
+            <div class="text-xs opacity-90 mt-1 font-bold">Khối ${g}</div>
+          </div>`;
+      }).join('') + `
+        <div class="bg-gradient-to-r from-indigo-600 to-purple-600 rounded-xl p-4 text-center col-span-2 md:col-span-1 hover:scale-[1.03] transition-all shadow-md">
+          <div class="text-3xl font-black">${students.length}</div>
+          <div class="text-xs opacity-90 mt-1 font-bold">Tổng Học Sinh</div>
+        </div>`;
+    }
+
+    // Dynamic Navigation controls on report tab target selectors
+    function onReportTargetChange() {
+      const gradeVal = document.getElementById('report-grade-select').value;
+      const classSelect = document.getElementById('report-class-select');
+      classSelect.innerHTML = '<option value="all">Tất cả lớp học</option>';
+
+      let availableClasses = [];
+      students.forEach(s => {
+        const g = s.grade || getGrade(s.class);
+        if (gradeVal === 'all' || String(g) === gradeVal) {
+          if (!availableClasses.includes(s.class)) {
+            availableClasses.push(s.class);
+          }
+        }
+      });
+
+      availableClasses.sort((a,b) => a.localeCompare(b, 'vi', { numeric: true }));
+      availableClasses.forEach(cls => {
+        const opt = document.createElement('option');
+        opt.value = cls;
+        opt.textContent = `Lớp ${cls}`;
+        classSelect.appendChild(opt);
+      });
+
+      generateReportPreview();
+    }
+
+    // Control toggles between standard vs Emulation score reports
+    function onReportTypeChange() {
+      const type = document.getElementById('report-type-select').value;
+      document.getElementById('sub-report-students').classList.toggle('hidden', type !== 'students');
+      document.getElementById('sub-report-emulation').classList.toggle('hidden', type !== 'emulation');
+      
+      if (type === 'emulation') {
+        onEmuScopeTypeChange();
+      } else {
+        generateReportPreview();
+      }
+    }
+
+    // Dynamic populated parameters in Emulation time frame selections
+    function onEmuScopeTypeChange() {
+      const scopeType = document.getElementById('emu-scope-type').value;
+      const scopeValSelect = document.getElementById('emu-scope-value');
+      scopeValSelect.innerHTML = '';
+
+      if (scopeType === 'week') {
+        for (let w = 1; w <= 37; w++) {
+          const opt = document.createElement('option');
+          opt.value = w;
+          opt.textContent = `Tuần ${w}`;
+          scopeValSelect.appendChild(opt);
+        }
+        // default to week 10 for sample data visibility
+        if (violations.some(v => v.week === '10')) {
+          scopeValSelect.value = '10';
+        }
+      } else if (scopeType === 'month') {
+        for (let m = 1; m <= 12; m++) {
+          const opt = document.createElement('option');
+          opt.value = m;
+          opt.textContent = `Tháng ${m}`;
+          scopeValSelect.appendChild(opt);
+        }
+        if (violations.some(v => v.month === '10')) {
+          scopeValSelect.value = '10';
+        }
+      } else if (scopeType === 'semester') {
+        const opts = ['Học kỳ I', 'Học kỳ II'];
+        opts.forEach(o => {
+          const opt = document.createElement('option');
+          opt.value = o;
+          opt.textContent = o;
+          scopeValSelect.appendChild(opt);
+        });
+      }
+
+      generateReportPreview();
+    }
+
+    // High quality live visual layout preview in A4 format simulation (including Boarding & Emulations)
+    function generateReportPreview() {
+      const previewContainer = document.getElementById('report-preview-sheet');
+      const reportType = document.getElementById('report-type-select').value;
+      
+      if (students.length === 0) {
+        previewContainer.innerHTML = `
+          <div class="text-center py-20 text-slate-400 space-y-3">
+            <i data-lucide="file-spreadsheet" class="w-16 h-16 mx-auto text-slate-300"></i>
+            <p class="text-sm font-semibold text-slate-500">Chưa có dữ liệu để lập báo cáo. Hãy chọn "Sử dụng dữ liệu mẫu" hoặc nạp từ tệp Excel!</p>
+          </div>
+        `;
+        lucide.createIcons();
+        return;
+      }
+
+      let currentDate = new Date();
+      let dateString = `Ngày ${currentDate.getDate()} tháng ${currentDate.getMonth() + 1} năm ${currentDate.getFullYear()}`;
+
+      if (reportType === 'students') {
+        // Render 1: Standard Students List
+        const selectedGrade = document.getElementById('report-grade-select').value;
+        const selectedClass = document.getElementById('report-class-select').value;
+        const selectedBoarding = document.getElementById('report-boarding-select').value;
+
+        let targetList = students.filter(s => {
+          const g = s.grade || getGrade(s.class);
+          const matchGrade = (selectedGrade === 'all') || (String(g) === selectedGrade);
+          const matchClass = (selectedClass === 'all') || (s.class === selectedClass);
+          
+          let matchBoarding = true;
+          if (selectedBoarding === 'yes') {
+            matchBoarding = (s.boarding === 'Có');
+          } else if (selectedBoarding === 'no') {
+            matchBoarding = (s.boarding === 'Không');
+          }
+          
+          return matchGrade && matchClass && matchBoarding;
+        });
+
+        targetList.sort((a, b) => {
+          if (a.grade !== b.grade) return a.grade - b.grade;
+          const classComp = a.class.localeCompare(b.class, 'vi', { numeric: true });
+          if (classComp !== 0) return classComp;
+          return compareVietnameseNames(a, b);
+        });
+
+        let titleReport = "DANH SÁCH HỌC SINH TOÀN TRƯỜNG";
+        if (selectedClass !== 'all') {
+          titleReport = `DANH SÁCH HỌC SINH LỚP ${selectedClass}`;
+        } else if (selectedGrade !== 'all') {
+          titleReport = `DANH SÁCH HỌC SINH KHỐI ${selectedGrade}`;
+        }
+
+        if (selectedBoarding === 'yes') {
+          titleReport += " - ĐĂNG KÝ BÁN TRÚ";
+        } else if (selectedBoarding === 'no') {
+          titleReport += " - KHÔNG BÁN TRÚ";
+        }
+
+        previewContainer.innerHTML = `
+          <div class="border-b-2 border-slate-800 pb-4 flex justify-between items-start">
+            <div class="text-center space-y-0.5">
+              <div class="font-semibold uppercase tracking-wide text-[10px]">ỦY BAN NHÂN DÂN PHƯỜNG BÌNH TIÊN</div>
+              <div class="font-bold uppercase tracking-wider text-xs text-indigo-900">TRƯỜNG THCS PHẠM ĐÌNH HỔ</div>
+            </div>
+            <div class="text-center space-y-0.5">
+              <div class="font-bold text-[10px] text-slate-800">CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM</div>
+              <div class="font-semibold text-[9px] text-slate-700 underline">Độc lập - Tự do - Hạnh phúc</div>
+            </div>
+          </div>
+
+          <div class="text-center py-4">
+            <h2 class="text-base font-black tracking-wide text-slate-900">${titleReport}</h2>
+            <p class="text-[9px] italic text-slate-500 mt-1">Năm học: 2025 - 2026 • Tổng số: ${targetList.length} học sinh (Xếp thứ tự A.B.C)</p>
+          </div>
+
+          <table class="w-full border-collapse border border-slate-400 text-[10px] text-slate-900">
+            <thead>
+              <tr class="bg-slate-100 text-slate-950 font-bold">
+                <th class="border border-slate-400 p-2 text-center w-[5%]">STT</th>
+                <th class="border border-slate-400 p-2 text-left w-[25%]">Họ và Tên</th>
+                <th class="border border-slate-400 p-2 text-center w-[8%]">Lớp học</th>
+                <th class="border border-slate-400 p-2 text-center w-[8%]">Giới tính</th>
+                <th class="border border-slate-400 p-2 text-center w-[8%]">Năm sinh</th>
+                <th class="border border-slate-400 p-2 text-center w-[18%]">SĐT liên hệ</th>
+                <th class="border border-slate-400 p-2 text-center w-[18%]">SĐT dự phòng</th>
+                <th class="border border-slate-400 p-2 text-center w-[10%]">Bán trú</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${targetList.map((s, idx) => `
+                <tr class="hover:bg-slate-50">
+                  <td class="border border-slate-400 p-2 text-center font-medium">${idx + 1}</td>
+                  <td class="border border-slate-400 p-2 font-bold">${s.name}</td>
+                  <td class="border border-slate-400 p-2 text-center font-semibold">${s.class}</td>
+                  <td class="border border-slate-400 p-2 text-center">${s.gender}</td>
+                  <td class="border border-slate-400 p-2 text-center">${s.birthYear}</td>
+                  <td class="border border-slate-400 p-2 text-center">${s.phone}</td>
+                  <td class="border border-slate-400 p-2 text-center text-slate-700">${s.phone2 !== 'N/A' ? s.phone2 : '-'}</td>
+                  <td class="border border-slate-400 p-2 text-center font-bold ${s.boarding === 'Có' ? 'text-emerald-700' : 'text-slate-400'}">${s.boarding || 'Không'}</td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+
+          <div class="grid grid-cols-2 pt-8 text-center text-[10px] gap-6 text-slate-900">
+            <div class="space-y-1">
+              <p class="font-semibold uppercase">Hiệu trưởng phê duyệt</p>
+              <p class="text-[9px] text-slate-400 italic">(Ký tên và đóng dấu)</p>
+              <div class="h-16"></div>
+              <p class="font-bold">BAN GIÁM HIỆU</p>
+            </div>
+            <div class="space-y-1">
+              <p class="italic text-slate-600">${dateString}</p>
+              <p class="font-semibold uppercase">Người lập báo cáo</p>
+              <p class="text-[9px] text-slate-400 italic">(Ký, ghi rõ họ tên)</p>
+              <div class="h-16"></div>
+            </div>
+          </div>
+        `;
+      } else {
+        // Render 2: Collective Class Emulation Board Score Grouped by Grade and Sorted internally (NEW)
+        const scopeType = document.getElementById('emu-scope-type').value;
+        const scopeValueEl = document.getElementById('emu-scope-value');
+        const scopeValue = scopeValueEl ? scopeValueEl.value : '';
+        
+        if (!scopeValue) {
+          previewContainer.innerHTML = `
+            <div class="text-center py-20 text-slate-400 space-y-3">
+              <i data-lucide="award" class="w-16 h-16 mx-auto text-slate-300"></i>
+              <p class="text-sm font-semibold text-slate-500">Chưa có đủ thông tin hoặc mốc thời gian để kết xuất bảng thi đua.</p>
+            </div>
+          `;
+          lucide.createIcons();
+          return;
+        }
+
+        // 1. Compute list of unique classes present
+        let allClasses = [...new Set(students.map(s => s.class))];
+        allClasses.sort((a,b) => a.localeCompare(b, 'vi', { numeric: true }));
+
+        // 2. Filter violations inside designated scope
+        const scopeViolations = violations.filter(v => {
+          if (scopeType === 'week') return v.week === scopeValue;
+          if (scopeType === 'month') return v.month === scopeValue;
+          if (scopeType === 'semester') return v.semester === scopeValue;
+          return true;
+        });
+
+        // 3. Score calculation
+        let classEmuList = allClasses.map(className => {
+          const classViolations = scopeViolations.filter(v => v.studentClass === className);
+          const totalDeducted = classViolations.reduce((sum, v) => sum + parseFloat(v.points || 0), 0);
+          const startingScore = 100;
+          const finalScore = startingScore - totalDeducted;
+
+          return {
+            className,
+            grade: getGrade(className),
+            violationsCount: classViolations.length,
+            pointsDeducted: totalDeducted,
+            finalScore: finalScore,
+            violationsList: classViolations
+          };
+        });
+
+        // 4. Group by Grade and rank within each grade (with tie handling / standard competition ranking)
+        const gradesList = [6, 7, 8, 9];
+        let classEmuByGrade = { 6: [], 7: [], 8: [], 9: [], 'other': [] };
+
+        classEmuList.forEach(item => {
+          const g = item.grade;
+          if (gradesList.includes(g)) {
+            classEmuByGrade[g].push(item);
+          } else {
+            classEmuByGrade['other'].push(item);
+          }
+        });
+
+        // Sort and rank inside each grade
+        gradesList.concat(['other']).forEach(g => {
+          if (!classEmuByGrade[g]) return;
+          // Sort descending by finalScore, then ascending by class name alphabetically
+          classEmuByGrade[g].sort((a, b) => b.finalScore - a.finalScore || a.className.localeCompare(b.className, 'vi', { numeric: true }));
+          
+          let rank = 0;
+          let skipped = 1;
+          let lastScore = null;
+          classEmuByGrade[g].forEach((item) => {
+            if (item.finalScore !== lastScore) {
+              rank += skipped;
+              skipped = 1;
+              lastScore = item.finalScore;
+            } else {
+              skipped++;
+            }
+            item.rank = rank;
+          });
+        });
+
+        // Generate rows with grade block dividers
+        let tableRowsHtml = '';
+        const allTargetGrades = [6, 7, 8, 9, 'other'];
+        
+        allTargetGrades.forEach(g => {
+          const list = classEmuByGrade[g];
+          if (!list || list.length === 0) return;
+          
+          const titleLabel = g === 'other' ? 'KHỐI KHÁC / CHƯA PHÂN LOẠI' : `KHỐI LỚP ${g}`;
+          
+          tableRowsHtml += `
+            <tr class="bg-indigo-50/80 font-bold text-indigo-900 text-center">
+              <td colspan="6" class="border border-slate-400 p-2 text-left uppercase tracking-wider text-[10px] font-extrabold">${titleLabel}</td>
+            </tr>
+          `;
+          
+          list.forEach(item => {
+            let badge = `Hạng ${item.rank}`;
+            if (item.rank === 1) badge = '🥇 Hạng 1';
+            if (item.rank === 2) badge = '🥈 Hạng 2';
+            if (item.rank === 3) badge = '🥉 Hạng 3';
+
+            let evaluation = 'Xuất sắc';
+            let evalClass = 'text-emerald-700 font-bold';
+            if (item.finalScore < 100 && item.finalScore >= 90) {
+              evaluation = 'Tốt';
+            } else if (item.finalScore < 90 && item.finalScore >= 80) {
+              evaluation = 'Khá';
+              evalClass = 'text-amber-700 font-bold';
+            } else if (item.finalScore < 80) {
+              evaluation = 'Yếu - Cần Chấn Chỉnh';
+              evalClass = 'text-rose-700 font-extrabold';
+            }
+
+            tableRowsHtml += `
+              <tr class="hover:bg-slate-50 font-medium">
+                <td class="border border-slate-400 p-2 text-center ${item.rank <= 3 ? 'font-bold bg-indigo-50/20' : ''}">${badge}</td>
+                <td class="border border-slate-400 p-2 font-bold text-slate-950 text-left">${item.className}</td>
+                <td class="border border-slate-400 p-2 text-center">${item.violationsCount}</td>
+                <td class="border border-slate-400 p-2 text-center text-red-600 font-bold">-${item.pointsDeducted}đ</td>
+                <td class="border border-slate-400 p-2 text-center text-indigo-900 font-extrabold text-xs">${item.finalScore}đ</td>
+                <td class="border border-slate-400 p-2 text-center ${evalClass}">${evaluation}</td>
+              </tr>
+            `;
+          });
+        });
+
+        // 5. Gather top individual infractions for the emulation section
+        let studentViolMap = {};
+        scopeViolations.forEach(v => {
+          const k = `${v.studentName} (${v.studentClass})`;
+          if (!studentViolMap[k]) {
+            studentViolMap[k] = { name: v.studentName, class: v.studentClass, pts: 0, count: 0 };
+          }
+          studentViolMap[k].pts += parseFloat(v.points || 0);
+          studentViolMap[k].count += 1;
+        });
+        
+        let seriousInfractions = Object.values(studentViolMap);
+        seriousInfractions.sort((a,b) => b.pts - a.pts);
+
+        let scopeTitle = `BÁO CÁO THI ĐUA TẬP THỂ - TUẦN ${scopeValue}`;
+        if (scopeType === 'month') scopeTitle = `BÁO CÁO THI ĐUA TẬP THỂ - THÁNG ${scopeValue}`;
+        if (scopeType === 'semester') scopeTitle = `BÁO CÁO THI ĐUA TẬP THỂ - KHU VỰC: ${scopeValue}`;
+
+        previewContainer.innerHTML = `
+          <div class="border-b-2 border-slate-800 pb-4 flex justify-between items-start">
+            <div class="text-center space-y-0.5">
+              <div class="font-semibold uppercase tracking-wide text-[10px]">ỦY BAN NHÂN DÂN PHƯỜNG BÌNH TIÊN</div>
+              <div class="font-bold uppercase tracking-wider text-xs text-indigo-900">TRƯỜNG THCS PHẠM ĐÌNH HỔ</div>
+            </div>
+            <div class="text-center space-y-0.5">
+              <div class="font-bold text-[10px] text-slate-800">CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM</div>
+              <div class="font-semibold text-[9px] text-slate-700 underline">Độc lập - Tự do - Hạnh phúc</div>
+            </div>
+          </div>
+
+          <div class="text-center py-4">
+            <h2 class="text-base font-black tracking-wide text-slate-900">${scopeTitle}</h2>
+            <p class="text-[9px] italic text-slate-500 mt-1">Năm học: 2025 - 2026 • Thống kê độc lập theo từng khối học (Đồng điểm xếp cùng hạng)</p>
+          </div>
+
+          <!-- Collective Class Emulation board -->
+          <div class="space-y-2">
+            <h3 class="font-bold text-[11px] text-slate-800 uppercase tracking-wider border-b border-slate-200 pb-1">1. Bảng Điểm Thi Đua Khối Lớp (Thang điểm chuẩn: 100)</h3>
+            <table class="w-full border-collapse border border-slate-400 text-[10px] text-slate-900">
+              <thead>
+                <tr class="bg-slate-100 text-slate-950 font-bold">
+                  <th class="border border-slate-400 p-2 text-center w-[12%]">Hạng</th>
+                  <th class="border border-slate-400 p-2 text-left w-[20%]">Lớp học</th>
+                  <th class="border border-slate-400 p-2 text-center w-[12%]">Số vi phạm</th>
+                  <th class="border border-slate-400 p-2 text-center w-[15%]">Điểm bị trừ</th>
+                  <th class="border border-slate-400 p-2 text-center w-[15%]">Điểm rèn luyện</th>
+                  <th class="border border-slate-400 p-2 text-center w-[26%]">Đánh giá chung</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${tableRowsHtml}
+              </tbody>
+            </table>
+          </div>
+
+          <!-- Top Individual infractions -->
+          <div class="space-y-2 pt-4">
+            <h3 class="font-bold text-[11px] text-slate-800 uppercase tracking-wider border-b border-slate-200 pb-1">2. Danh Sách Học Sinh Cần Lưu Ý Giáo Dục Trong Kỳ</h3>
+            ${seriousInfractions.length === 0 ? `
+              <p class="text-[9px] text-slate-500 italic">Tuyệt vời! Không ghi nhận học sinh vi phạm kỷ luật trong mốc thời gian này.</p>
+            ` : `
+              <table class="w-full border-collapse border border-slate-400 text-[9px] text-slate-900">
+                <thead>
+                  <tr class="bg-red-50 text-slate-950 font-bold">
+                    <th class="border border-slate-400 p-2 text-center w-[8%]">STT</th>
+                    <th class="border border-slate-400 p-2 text-left w-[35%]">Họ và tên</th>
+                    <th class="border border-slate-400 p-2 text-center w-[15%]">Lớp</th>
+                    <th class="border border-slate-400 p-2 text-center w-[20%]">Số lỗi vi phạm</th>
+                    <th class="border border-slate-400 p-2 text-center w-[22%]">Tổng điểm trừ</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  ${seriousInfractions.slice(0, 5).map((inf, idx) => `
+                    <tr>
+                      <td class="border border-slate-400 p-2 text-center">${idx + 1}</td>
+                      <td class="border border-slate-400 p-2 font-bold">${inf.name}</td>
+                      <td class="border border-slate-400 p-2 text-center font-semibold">${inf.class}</td>
+                      <td class="border border-slate-400 p-2 text-center">${inf.count} lần</td>
+                      <td class="border border-slate-400 p-2 text-center font-extrabold text-red-600">-${inf.pts}đ</td>
+                    </tr>
+                  `).join('')}
+                </tbody>
+              </table>
+              <p class="text-[8px] text-slate-500 italic">* Lưu ý: Danh sách này thống kê các học sinh có tổng điểm trừ cao nhất, yêu cầu GVCN phối hợp chặt chẽ với phụ huynh để có biện pháp nhắc nhở.</p>
+            `}
+          </div>
+
+          <div class="grid grid-cols-2 pt-8 text-center text-[10px] gap-6 text-slate-900">
+            <div class="space-y-1">
+              <p class="font-semibold uppercase">Hiệu trưởng phê duyệt</p>
+              <p class="text-[9px] text-slate-400 italic">(Ký tên và đóng dấu)</p>
+              <div class="h-16"></div>
+              <p class="font-bold">BAN GIÁM HIỆU</p>
+            </div>
+            <div class="space-y-1">
+              <p class="italic text-slate-600">${dateString}</p>
+              <p class="font-semibold uppercase">Tổng phụ trách Đội lập</p>
+              <p class="text-[9px] text-slate-400 italic">(Ký, ghi rõ họ tên)</p>
+              <div class="h-16"></div>
+            </div>
+          </div>
+        `;
+      }
+      lucide.createIcons();
+    }
+
+    // High Quality Print logic
+    function printReport() {
+      if (students.length === 0) {
+        showToast('❌ Không có dữ liệu để in!');
+        return;
+      }
+      
+      const previewHtml = document.getElementById('report-preview-sheet').innerHTML;
+      document.getElementById('print-content').innerHTML = previewHtml;
+      window.print();
+    }
+
+    // Export beautiful styled excel spreadsheet matching selection parameters
+    function exportReport() {
+      if (!students.length) { 
+        showToast('❌ Chưa có dữ liệu để xuất file!'); 
+        return; 
+      }
+
+      const reportType = document.getElementById('report-type-select').value;
+      const wb = XLSX.utils.book_new();
+
+      if (reportType === 'students') {
+        const selectedGrade = document.getElementById('report-grade-select').value;
+        const selectedClass = document.getElementById('report-class-select').value;
+        const selectedBoarding = document.getElementById('report-boarding-select').value;
+
+        let filtered = students.filter(s => {
+          const g = s.grade || getGrade(s.class);
+          const matchGrade = (selectedGrade === 'all') || (String(g) === selectedGrade);
+          const matchClass = (selectedClass === 'all') || (s.class === selectedClass);
+          
+          let matchBoarding = true;
+          if (selectedBoarding === 'yes') {
+            matchBoarding = (s.boarding === 'Có');
+          } else if (selectedBoarding === 'no') {
+            matchBoarding = (s.boarding === 'Không');
+          }
+          
+          return matchGrade && matchClass && matchBoarding;
+        });
+
+        filtered.sort((a,b) => {
+          if (a.grade !== b.grade) return a.grade - b.grade;
+          const classComp = a.class.localeCompare(b.class, 'vi', { numeric: true });
+          if (classComp !== 0) return classComp;
+          return compareVietnameseNames(a, b);
+        });
+
+        const wsData = [
+          ['TRƯỜNG THCS PHẠM ĐÌNH HỔ - BAN GIÁM HIỆU'],
+          ['DANH SÁCH LÝ LỊCH HỌC SINH CHI TIẾT (Theo thứ tự A.B.C)'],
+          [`Thời gian xuất bản: ${new Date().toLocaleDateString('vi-VN')}`],
+          [], 
+          ['STT', 'Họ và tên học sinh', 'Lớp học', 'Giới tính', 'Năm sinh', 'SĐT chính', 'SĐT dự phòng', 'Bán trú']
+        ];
+
+        filtered.forEach((s, idx) => {
+          wsData.push([
+            idx + 1, 
+            s.name, 
+            s.class, 
+            s.gender, 
+            s.birthYear, 
+            { v: s.phone, t: 's' },
+            { v: s.phone2 !== 'N/A' ? s.phone2 : '', t: 's' },
+            s.boarding || 'Không'
+          ]);
+        });
+        
+        const ws = XLSX.utils.aoa_to_sheet(wsData);
+        ws['!cols'] = [
+          { wch: 6 },  { wch: 30 }, { wch: 12 }, { wch: 12 },
+          { wch: 15 }, { wch: 20 }, { wch: 20 }, { wch: 12 }
+        ];
+        ws['!merges'] = [
+          { s: { r: 0, c: 0 }, e: { r: 0, c: 7 } },
+          { s: { r: 1, c: 0 }, e: { r: 1, c: 7 } },
+          { s: { r: 2, c: 0 }, e: { r: 2, c: 7 } }
+        ];
+
+        XLSX.utils.book_append_sheet(wb, ws, 'Báo cáo Học Sinh');
+        
+        let filename = 'BaoCao_LyLich_HocSinh.xlsx';
+        if (selectedClass !== 'all') {
+          filename = `Danh_Sach_Hoc_Sinh_Lop_${selectedClass}.xlsx`;
+        } else if (selectedGrade !== 'all') {
+          filename = `Danh_Sach_Hoc_Sinh_Khoi_${selectedGrade}.xlsx`;
+        }
+        XLSX.writeFile(wb, filename);
+
+      } else {
+        // Export collective class emulation board score grouped by grade and sorted internally
+        const scopeType = document.getElementById('emu-scope-type').value;
+        const scopeValue = document.getElementById('emu-scope-value').value;
+
+        let allClasses = [...new Set(students.map(s => s.class))];
+        allClasses.sort((a,b) => a.localeCompare(b, 'vi', { numeric: true }));
+
+        const scopeViolations = violations.filter(v => {
+          if (scopeType === 'week') return v.week === scopeValue;
+          if (scopeType === 'month') return v.month === scopeValue;
+          if (scopeType === 'semester') return v.semester === scopeValue;
+          return true;
+        });
+
+        let classEmuList = allClasses.map(className => {
+          const classViolations = scopeViolations.filter(v => v.studentClass === className);
+          const totalDeducted = classViolations.reduce((sum, v) => sum + parseFloat(v.points || 0), 0);
+          return {
+            className,
+            grade: getGrade(className),
+            violationsCount: classViolations.length,
+            pointsDeducted: totalDeducted,
+            finalScore: 100 - totalDeducted
+          };
+        });
+
+        // Group by Grade and rank within each grade (equal-score tie-breaker handled)
+        const gradesList = [6, 7, 8, 9];
+        let classEmuByGrade = { 6: [], 7: [], 8: [], 9: [], 'other': [] };
+
+        classEmuList.forEach(item => {
+          const g = item.grade;
+          if (gradesList.includes(g)) {
+            classEmuByGrade[g].push(item);
+          } else {
+            classEmuByGrade['other'].push(item);
+          }
+        });
+
+        // Sort and rank inside each grade
+        gradesList.concat(['other']).forEach(g => {
+          if (!classEmuByGrade[g]) return;
+          classEmuByGrade[g].sort((a, b) => b.finalScore - a.finalScore || a.className.localeCompare(b.className, 'vi', { numeric: true }));
+          
+          let rank = 0;
+          let skipped = 1;
+          let lastScore = null;
+          classEmuByGrade[g].forEach((item) => {
+            if (item.finalScore !== lastScore) {
+              rank += skipped;
+              skipped = 1;
+              lastScore = item.finalScore;
+            } else {
+              skipped++;
+            }
+            item.rank = rank;
+          });
+        });
+
+        const labelMap = { 'week': 'Tuần', 'month': 'Tháng', 'semester': 'Học kỳ' };
+        const wsData = [
+          ['TRƯỜNG THCS PHẠM ĐÌNH HỔ - BAN THI ĐUA'],
+          [`BẢNG ĐIỂM THI ĐUA TẬP THỂ LỚP - ${labelMap[scopeType].toUpperCase()} ${scopeValue}`],
+          [`Thời gian xuất bản: ${new Date().toLocaleDateString('vi-VN')}`],
+          [],
+          ['Hạng', 'Lớp học', 'Số vi phạm rèn luyện', 'Điểm thi đua bị trừ', 'Điểm thi đua chung', 'Xếp loại chung']
+        ];
+
+        const allTargetGrades = [6, 7, 8, 9, 'other'];
+        allTargetGrades.forEach(g => {
+          const list = classEmuByGrade[g];
+          if (!list || list.length === 0) return;
+          
+          const blockTitle = g === 'other' ? 'KHỐI KHÁC / CHƯA PHÂN LOẠI' : `KHỐI LỚP ${g}`;
+          // Section header in Excel sheet
+          wsData.push([blockTitle, '', '', '', '', '']);
+
+          list.forEach(item => {
+            let evalStr = 'Xuất sắc';
+            if (item.finalScore < 100 && item.finalScore >= 90) evalStr = 'Tốt';
+            else if (item.finalScore < 90 && item.finalScore >= 80) evalStr = 'Khá';
+            else if (item.finalScore < 80) evalStr = 'Yếu';
+
+            wsData.push([
+              `Hạng ${item.rank}`,
+              item.className,
+              item.violationsCount,
+              -item.pointsDeducted,
+              item.finalScore,
+              evalStr
+            ]);
+          });
+        });
+
+        const ws = XLSX.utils.aoa_to_sheet(wsData);
+        ws['!cols'] = [
+          { wch: 12 }, { wch: 15 }, { wch: 22 }, { wch: 20 }, { wch: 20 }, { wch: 25 }
+        ];
+        ws['!merges'] = [
+          { s: { r: 0, c: 0 }, e: { r: 0, c: 5 } },
+          { s: { r: 1, c: 0 }, e: { r: 1, c: 5 } },
+          { s: { r: 2, c: 0 }, e: { r: 2, c: 5 } }
+        ];
+
+        XLSX.utils.book_append_sheet(wb, ws, 'Báo Cáo Thi Đua');
+        XLSX.writeFile(wb, `BaoCao_ThiDua_TapThe_${labelMap[scopeType]}_${scopeValue}.xlsx`);
+      }
+
+      showToast('✓ Đã xuất file báo cáo Excel thành công!');
+    }
+
+    // ----------------------------------------------------
+    // MOBILE QR CONNECTION ENGINE (NEW)
+    // ----------------------------------------------------
+    function openQrModal() {
+      const modal = document.getElementById('qr-modal');
+      const img = document.getElementById('qr-code-img');
+      const urlText = document.getElementById('qr-link-url');
+      const syncInput = document.getElementById('sync-channel-input');
+
+      // Detect active hosting url dynamically
+      let activeUrl = window.location.href;
+      
+      // If run locally via file protocol, warn teacher how local IP network scan works
+      if (activeUrl.startsWith('file:///')) {
+        activeUrl = "http://localhost:5500/"; // Placeholder instruction
+        showToast("💡 Gợi ý: Hãy upload file lên Github Pages hoặc Vercel để quét QR thuận tiện nhất!");
+      }
+
+      // Encode URL and trigger beautiful stable free QR API 
+      const qrApiUrl = `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(window.location.href)}`;
+      
+      img.src = qrApiUrl;
+      urlText.textContent = window.location.href;
+      syncInput.value = syncChannelCode;
+
+      modal.classList.remove('hidden');
+      lucide.createIcons();
+    }
+
+    function closeQrModal() {
+      document.getElementById('qr-modal').classList.add('hidden');
+    }
+
+    function copyQrLink() {
+      const url = window.location.href;
+      const el = document.createElement('textarea');
+      el.value = url;
+      document.body.appendChild(el);
+      el.select();
+      document.execCommand('copy');
+      document.body.removeChild(el);
+      showToast('✓ Đã copy liên kết hệ thống vào khay nhớ tạm!');
+    }
+
+    async function changeSyncChannel() {
+      const val = document.getElementById('sync-channel-input').value.trim().toUpperCase();
+      if (!val) {
+        showToast('❌ Tên kênh không được bỏ trống!');
+        return;
+      }
+      
+      syncChannelCode = val;
+      localStorage.setItem("find_hs_sync_channel", val);
+      
+      showToast(`✓ Đang thiết lập và tải kênh đồng bộ mới: ${val}...`);
+      
+      // Re-trigger auth sync on new channel room
+      if (isCloudMode) {
+        startRealtimeSync();
+      }
+      closeQrModal();
+    }
+
+    // Troubleshoot guidelines for non-configured Firebase projects
+    function showFirebaseTroubleshoot() {
+      document.getElementById('troubleshoot-modal').classList.remove('hidden');
+      lucide.createIcons();
+    }
+
+    function closeTroubleshootModal() {
+      document.getElementById('troubleshoot-modal').classList.add('hidden');
+    }
+
+    // Custom non-blocking Confirmation dialog modal handlers
+    function showConfirm(title, message, onConfirm) {
+      document.getElementById('confirm-title').innerText = title;
+      document.getElementById('confirm-message').innerText = message;
+      confirmCallback = onConfirm;
+      document.getElementById('confirm-modal').classList.remove('hidden');
+    }
+
+    function closeConfirm(agreed) {
+      document.getElementById('confirm-modal').classList.add('hidden');
+      if (agreed && confirmCallback) {
+        confirmCallback();
+      }
+      confirmCallback = null;
+    }
+
+    function showToast(msg) {
+      const existing = document.getElementById('dynamic-toast');
+      if (existing) existing.remove();
+
+      const t = document.createElement('div');
+      t.id = 'dynamic-toast';
+      t.className = 'fixed bottom-6 left-1/2 -translate-x-1/2 bg-slate-800 text-white border border-indigo-500 px-5 py-3 rounded-xl shadow-2xl text-xs z-50 animate-bounce font-medium flex items-center gap-2 max-w-sm text-center';
+      t.innerHTML = `<span>${msg}</span>`;
+      document.body.appendChild(t);
+      setTimeout(() => t.remove(), 3500);
+    }
+
+    // Runs on ready (Kiểm tra cả hai trường hợp SDK sẵn sàng sớm hay muộn)
+    if (window.FirebaseSDK) {
+      initFirebase();
+    } else {
+      window.addEventListener('firebase-sdk-ready', () => {
+        initFirebase();
+      });
+    }
+
+    window.onload = function() {
+      lucide.createIcons();
+    };
+  </script>
+ </body>
+</html>
