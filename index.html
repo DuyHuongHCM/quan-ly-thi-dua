@@ -757,13 +757,14 @@ service cloud.firestore {
       { id: 'rule_7', name: 'Vi phạm kiểu tóc / Trang phục sai quy định', points: 2, category: 'Đồng phục' },
       { id: 'rule_8', name: 'Nói bậy / Đùa nghịch thô bạo gây gổ', points: 5, category: 'Đạo đức' }
     ];
+    const DEFAULT_ACTIVE_TAB = 'import';
 
     const appState = {
       students: [],
       violations: [],
       violationTypes: [...defaultViolationTypes],
       lockedWeeks: {},
-      activeTab: 'import',
+      activeTab: DEFAULT_ACTIVE_TAB,
       isProgrammaticDropdownUpdate: false,
       currentGradeFilter: 0,
       currentWorkbook: null,
@@ -1310,7 +1311,7 @@ service cloud.firestore {
 
     function onViolationWeekChange(weekVal) {
       if (appState.isProgrammaticDropdownUpdate) {
-        // Ignore synthetic week updates while dropdowns are being rebuilt from sync data.
+        // Ignore programmatic updates while dropdowns are being rebuilt from sync data.
         return;
       }
       const dateEl = document.getElementById('violation-date');
