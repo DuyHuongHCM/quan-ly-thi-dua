@@ -1310,7 +1310,7 @@ service cloud.firestore {
 
     function onViolationWeekChange(weekVal) {
       if (appState.isProgrammaticDropdownUpdate) {
-        updateViolationModalLockState();
+        // Ignore synthetic week updates while dropdowns are being rebuilt from sync data.
         return;
       }
       const dateEl = document.getElementById('violation-date');
@@ -2433,6 +2433,7 @@ service cloud.firestore {
       const tbody = document.getElementById('logs-table-body');
       const emptyView = document.getElementById('logs-empty-view');
       syncWeekLockButtonState();
+      // Skip log filtering rerender when dropdown values are being set programmatically.
       if (appState.isProgrammaticDropdownUpdate) return;
       const filterWeek = document.getElementById('log-filter-week').value;
       const searchQ = document.getElementById('log-search-input').value.trim().toLowerCase();
