@@ -351,7 +351,7 @@
              </div>
              <div>
                <label class="block text-xs font-bold text-slate-450 mb-1">Tuần học</label>
-               <select id="violation-week" onchange="updateViolationModalLockState()" class="w-full bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-red-500 cursor-pointer"></select>
+               <select id="violation-week" onchange="onViolationWeekChange(this.value)" class="w-full bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-red-500 cursor-pointer"></select>
              </div>
            </div>
 
@@ -1193,9 +1193,55 @@ service cloud.firestore {
       }
     }
 
+    const TOTAL_SCHOOL_WEEKS = 36;
+    const WEEK_ONE_SPLIT = 18;
+
+    function parseDateInputValue(dateStr) {
+      const m = String(dateStr || '').match(/^(\d{4})-(\d{2})-(\d{2})$/);
+      if (!m) return new Date(dateStr);
+      return new Date(parseInt(m[1], 10), parseInt(m[2], 10) - 1, parseInt(m[3], 10));
+    }
+
+    function formatDateInputValue(date) {
+      if (!(date instanceof Date) || Number.isNaN(date.getTime())) return '';
+      const y = date.getFullYear();
+      const m = String(date.getMonth() + 1).padStart(2, '0');
+      const d = String(date.getDate()).padStart(2, '0');
+      return `${y}-${m}-${d}`;
+    }
+
+    function getMondayOfWeek(date) {
+      const d = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+      const dow = d.getDay();
+      const shift = dow === 0 ? -6 : 1 - dow;
+      d.setDate(d.getDate() + shift);
+      return d;
+    }
+
+    function getSchoolYearStartDate(date) {
+      const y = date.getFullYear();
+      const m = date.getMonth();
+      const day = date.getDate();
+      const startYear = (m > 8 || (m === 8 && day >= 5)) ? y : y - 1;
+      return new Date(startYear, 8, 5);
+    }
+
+    function getWeekStartDateFromWeekNumber(weekValue, baseDateStr = '') {
+      const parsedWeek = parseInt(String(weekValue || ''), 10);
+      const week = Math.min(TOTAL_SCHOOL_WEEKS, Math.max(1, Number.isNaN(parsedWeek) ? 1 : parsedWeek));
+      const baseDate = parseDateInputValue(baseDateStr);
+      const fallbackDate = new Date();
+      const refDate = Number.isNaN(baseDate.getTime()) ? fallbackDate : baseDate;
+      const schoolStart = getSchoolYearStartDate(refDate);
+      const weekOneMonday = getMondayOfWeek(schoolStart);
+      const weekStart = new Date(weekOneMonday);
+      weekStart.setDate(weekOneMonday.getDate() + (week - 1) * 7);
+      return weekStart;
+    }
+
     // Populate standard dropdown selector options
     function initGlobalDropdowns() {
-      // 1. Select week dropdowns (Week 1 to Week 37)
+      // 1. Select week dropdowns (Week 1 to Week 36)
       const selects = ['violation-week', 'log-filter-week'];
       selects.forEach(id => {
         const el = document.getElementById(id);
@@ -1204,7 +1250,7 @@ service cloud.firestore {
         // Save initial selection if in logs
         const origVal = el.value;
         el.innerHTML = id === 'log-filter-week' ? '<option value="all">Tất cả các tuần</option>' : '';
-        for (let w = 1; w <= 37; w++) {
+        for (let w = 1; w <= TOTAL_SCHOOL_WEEKS; w++) {
           const opt = document.createElement('option');
           opt.value = w;
           opt.textContent = `Tuần ${w}`;
@@ -1229,27 +1275,19 @@ service cloud.firestore {
 
     // Automatic calculation of school weeks from date
     function calculateSchoolParams(dateStr) {
-      const d = new Date(dateStr);
-      if (isNaN(d)) return { week: 1, month: 9, semester: 'Học kỳ I' };
-      
-      const month = d.getMonth() + 1;
-      let semester = 'Học kỳ I';
-      if (month >= 1 && month <= 5) {
-        semester = 'Học kỳ II';
-      }
-      
-      const year = d.getFullYear();
-      let schoolStart = new Date(year, 8, 1); // standard Sep 1st
-      if (month < 8) {
-        schoolStart = new Date(year - 1, 8, 1);
-      }
-      
-      const diffTime = Math.abs(d - schoolStart);
-      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-      let week = Math.ceil(diffDays / 7);
+      const d = parseDateInputValue(dateStr);
+      if (Number.isNaN(d.getTime())) return { week: 1, month: 9, semester: 'Học kỳ I' };
+
+      const schoolStart = getSchoolYearStartDate(d);
+      const weekOneMonday = getMondayOfWeek(schoolStart);
+      const targetMonday = getMondayOfWeek(d);
+      const weekDiff = Math.floor((targetMonday - weekOneMonday) / (1000 * 60 * 60 * 24 * 7)) + 1;
+      let week = weekDiff;
       if (week < 1) week = 1;
-      if (week > 37) week = 37;
-      
+      if (week > TOTAL_SCHOOL_WEEKS) week = TOTAL_SCHOOL_WEEKS;
+
+      const month = d.getMonth() + 1;
+      const semester = week <= WEEK_ONE_SPLIT ? 'Học kỳ I' : 'Học kỳ II';
       return { week, month, semester };
     }
 
@@ -1259,6 +1297,24 @@ service cloud.firestore {
       document.getElementById('violation-week').value = params.week;
       document.getElementById('violation-month').value = params.month;
       document.getElementById('violation-semester').value = params.semester;
+      updateViolationModalLockState();
+    }
+
+    function onViolationWeekChange(weekVal) {
+      const dateEl = document.getElementById('violation-date');
+      const monthEl = document.getElementById('violation-month');
+      const semesterEl = document.getElementById('violation-semester');
+      const weekEl = document.getElementById('violation-week');
+      if (!dateEl || !monthEl || !semesterEl || !weekEl) return;
+
+      const weekStart = getWeekStartDateFromWeekNumber(weekVal, dateEl.value);
+      const weekDateStr = formatDateInputValue(weekStart);
+      dateEl.value = weekDateStr;
+
+      const params = calculateSchoolParams(weekDateStr);
+      weekEl.value = params.week;
+      monthEl.value = params.month;
+      semesterEl.value = params.semester;
       updateViolationModalLockState();
     }
 
@@ -1834,6 +1890,50 @@ service cloud.firestore {
       return m ? parseInt(m[1]) : 0;
     }
 
+    function getClassTypePriority(className) {
+      const normalized = String(className || '').toUpperCase();
+      if (normalized.includes('A')) return 1; // Tăng cường tiếng Anh
+      if (normalized.includes('H')) return 2; // Tăng cường tiếng Hoa
+      return 3; // Lớp thường
+    }
+
+    function getClassSequenceNumber(className) {
+      const nums = String(className || '').match(/\d+/g);
+      if (!nums || nums.length === 0) return 0;
+      const parsed = parseInt(nums[nums.length - 1], 10);
+      return Number.isNaN(parsed) ? 0 : parsed;
+    }
+
+    function compareClassNames(aClass, bClass) {
+      const priorityDiff = getClassTypePriority(aClass) - getClassTypePriority(bClass);
+      if (priorityDiff !== 0) return priorityDiff;
+
+      const gradeDiff = getGrade(aClass) - getGrade(bClass);
+      if (gradeDiff !== 0) return gradeDiff;
+
+      const seqDiff = getClassSequenceNumber(aClass) - getClassSequenceNumber(bClass);
+      if (seqDiff !== 0) return seqDiff;
+
+      return String(aClass).localeCompare(String(bClass), 'vi', { numeric: true, sensitivity: 'base' });
+    }
+
+    function compareStudentsByClassPriority(a, b) {
+      const classComp = compareClassNames(a.class, b.class);
+      if (classComp !== 0) return classComp;
+      return compareVietnameseNames(a, b);
+    }
+
+    function calculateGenderSummary(list) {
+      let male = 0;
+      let female = 0;
+      list.forEach(s => {
+        const g = removeVietnameseTones(String(s.gender || '').trim().toLowerCase());
+        if (g === 'nam') male++;
+        else if (g === 'nu') female++;
+      });
+      return { male, female };
+    }
+
     function gradeClass(cls) {
       const g = getGrade(cls);
       if (g === 6) return 'grade-6';
@@ -1947,15 +2047,8 @@ service cloud.firestore {
         return;
       }
 
-      // Sort by Grade -> Class -> Name
-      filteredCache.sort((a, b) => {
-        if (a.grade !== b.grade) return a.grade - b.grade;
-        
-        const classComp = a.class.localeCompare(b.class, 'vi', { numeric: true });
-        if (classComp !== 0) return classComp;
-        
-        return compareVietnameseNames(a, b);
-      });
+      // Sort by custom class priority -> student name
+      filteredCache.sort(compareStudentsByClassPriority);
 
       count.textContent = `Tìm thấy ${filteredCache.length} học sinh phù hợp`;
 
@@ -2437,7 +2530,7 @@ service cloud.firestore {
         }
       });
 
-      availableClasses.sort((a,b) => a.localeCompare(b, 'vi', { numeric: true }));
+      availableClasses.sort(compareClassNames);
       availableClasses.forEach(cls => {
         const opt = document.createElement('option');
         opt.value = cls;
@@ -2468,7 +2561,7 @@ service cloud.firestore {
       scopeValSelect.innerHTML = '';
 
       if (scopeType === 'week') {
-        for (let w = 1; w <= 37; w++) {
+        for (let w = 1; w <= TOTAL_SCHOOL_WEEKS; w++) {
           const opt = document.createElement('option');
           opt.value = w;
           opt.textContent = `Tuần ${w}`;
@@ -2541,12 +2634,8 @@ service cloud.firestore {
           return matchGrade && matchClass && matchBoarding;
         });
 
-        targetList.sort((a, b) => {
-          if (a.grade !== b.grade) return a.grade - b.grade;
-          const classComp = a.class.localeCompare(b.class, 'vi', { numeric: true });
-          if (classComp !== 0) return classComp;
-          return compareVietnameseNames(a, b);
-        });
+        targetList.sort(compareStudentsByClassPriority);
+        const genderSummary = calculateGenderSummary(targetList);
 
         let titleReport = "DANH SÁCH HỌC SINH TOÀN TRƯỜNG";
         if (selectedClass !== 'all') {
@@ -2575,7 +2664,7 @@ service cloud.firestore {
 
           <div class="text-center py-4">
             <h2 class="text-base font-black tracking-wide text-slate-900">${titleReport}</h2>
-            <p class="text-[9px] italic text-slate-500 mt-1">Năm học: 2025 - 2026 • Tổng số: ${targetList.length} học sinh (Xếp thứ tự A.B.C)</p>
+            <p class="text-[9px] italic text-slate-500 mt-1">Năm học: 2025 - 2026 • Tổng số: ${targetList.length} học sinh (Nam: ${genderSummary.male} / Nữ: ${genderSummary.female})</p>
           </div>
 
           <table class="w-full border-collapse border border-slate-400 text-[10px] text-slate-900">
@@ -2641,7 +2730,7 @@ service cloud.firestore {
 
         // 1. Compute list of unique classes present
         let allClasses = [...new Set(students.map(s => s.class))];
-        allClasses.sort((a,b) => a.localeCompare(b, 'vi', { numeric: true }));
+        allClasses.sort(compareClassNames);
 
         // 2. Filter violations inside designated scope
         const scopeViolations = violations.filter(v => {
@@ -2685,7 +2774,7 @@ service cloud.firestore {
         gradesList.concat(['other']).forEach(g => {
           if (!classEmuByGrade[g]) return;
           // Sort descending by finalScore, then ascending by class name alphabetically
-          classEmuByGrade[g].sort((a, b) => b.finalScore - a.finalScore || a.className.localeCompare(b.className, 'vi', { numeric: true }));
+          classEmuByGrade[g].sort((a, b) => b.finalScore - a.finalScore || compareClassNames(a.className, b.className));
           
           let rank = 0;
           let skipped = 1;
@@ -2897,16 +2986,13 @@ service cloud.firestore {
           return matchGrade && matchClass && matchBoarding;
         });
 
-        filtered.sort((a,b) => {
-          if (a.grade !== b.grade) return a.grade - b.grade;
-          const classComp = a.class.localeCompare(b.class, 'vi', { numeric: true });
-          if (classComp !== 0) return classComp;
-          return compareVietnameseNames(a, b);
-        });
+        filtered.sort(compareStudentsByClassPriority);
+        const genderSummary = calculateGenderSummary(filtered);
 
         const wsData = [
           ['TRƯỜNG THCS PHẠM ĐÌNH HỔ - BAN GIÁM HIỆU'],
-          ['DANH SÁCH LÝ LỊCH HỌC SINH CHI TIẾT (Theo thứ tự A.B.C)'],
+          ['DANH SÁCH LÝ LỊCH HỌC SINH CHI TIẾT'],
+          [`Năm học: 2025 - 2026 • Tổng số: ${filtered.length} học sinh (Nam: ${genderSummary.male} / Nữ: ${genderSummary.female})`],
           [`Thời gian xuất bản: ${new Date().toLocaleDateString('vi-VN')}`],
           [], 
           ['STT', 'Họ và tên học sinh', 'Lớp học', 'Giới tính', 'Năm sinh', 'SĐT chính', 'SĐT dự phòng', 'Bán trú']
@@ -2933,7 +3019,8 @@ service cloud.firestore {
         ws['!merges'] = [
           { s: { r: 0, c: 0 }, e: { r: 0, c: 7 } },
           { s: { r: 1, c: 0 }, e: { r: 1, c: 7 } },
-          { s: { r: 2, c: 0 }, e: { r: 2, c: 7 } }
+          { s: { r: 2, c: 0 }, e: { r: 2, c: 7 } },
+          { s: { r: 3, c: 0 }, e: { r: 3, c: 7 } }
         ];
 
         XLSX.utils.book_append_sheet(wb, ws, 'Báo cáo Học Sinh');
@@ -2952,7 +3039,7 @@ service cloud.firestore {
         const scopeValue = document.getElementById('emu-scope-value').value;
 
         let allClasses = [...new Set(students.map(s => s.class))];
-        allClasses.sort((a,b) => a.localeCompare(b, 'vi', { numeric: true }));
+        allClasses.sort(compareClassNames);
 
         const scopeViolations = violations.filter(v => {
           if (scopeType === 'week') return v.week === scopeValue;
@@ -2989,7 +3076,7 @@ service cloud.firestore {
         // Sort and rank inside each grade
         gradesList.concat(['other']).forEach(g => {
           if (!classEmuByGrade[g]) return;
-          classEmuByGrade[g].sort((a, b) => b.finalScore - a.finalScore || a.className.localeCompare(b.className, 'vi', { numeric: true }));
+          classEmuByGrade[g].sort((a, b) => b.finalScore - a.finalScore || compareClassNames(a.className, b.className));
           
           let rank = 0;
           let skipped = 1;
