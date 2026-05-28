@@ -757,14 +757,14 @@ service cloud.firestore {
       { id: 'rule_7', name: 'Vi phạm kiểu tóc / Trang phục sai quy định', points: 2, category: 'Đồng phục' },
       { id: 'rule_8', name: 'Nói bậy / Đùa nghịch thô bạo gây gổ', points: 5, category: 'Đạo đức' }
     ];
-    const DEFAULT_ACTIVE_TAB = 'import';
+    const INITIAL_ACTIVE_TAB = 'import';
 
     const appState = {
       students: [],
       violations: [],
       violationTypes: [...defaultViolationTypes],
       lockedWeeks: {},
-      activeTab: DEFAULT_ACTIVE_TAB,
+      activeTab: INITIAL_ACTIVE_TAB,
       isProgrammaticDropdownUpdate: false,
       currentGradeFilter: 0,
       currentWorkbook: null,
