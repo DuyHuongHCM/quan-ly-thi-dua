@@ -773,6 +773,7 @@ service cloud.firestore {
       auth: null,
       userId: null,
       authUnsubscribe: null,
+      isRealtimeLifecycleBound: false,
       confirmCallback: null,
       syncUnsubscribe: null,
       syncChannelCode: localStorage.getItem("find_hs_sync_channel") || "PDH_2026",
@@ -794,7 +795,7 @@ service cloud.firestore {
       'students', 'violations', 'violationTypes', 'lockedWeeks',
       'currentGradeFilter', 'currentWorkbook', 'currentRows',
       'searchLimit', 'filteredCache', 'isCloudMode',
-      'db', 'auth', 'userId', 'authUnsubscribe', 'confirmCallback',
+      'db', 'auth', 'userId', 'authUnsubscribe', 'isRealtimeLifecycleBound', 'confirmCallback',
       'syncUnsubscribe', 'syncChannelCode', 'activeStudentIndex'
     ].forEach(bindStateProperty);
 
@@ -1006,7 +1007,6 @@ service cloud.firestore {
       });
     }
 
-    let isRealtimeLifecycleBound = false;
     function bindRealtimeLifecycleHandlers() {
       if (isRealtimeLifecycleBound) return;
       isRealtimeLifecycleBound = true;
@@ -1267,12 +1267,20 @@ service cloud.firestore {
     }
 
     function normalizeWeekValue(weekVal) {
-      return String(parseInt(weekVal, 10) || '');
+      const parsedWeek = parseInt(weekVal, 10);
+      return Number.isNaN(parsedWeek) ? '' : String(parsedWeek);
     }
 
     function isWeekLocked(weekVal) {
       const normalized = normalizeWeekValue(weekVal);
       return !!(normalized && lockedWeeks && lockedWeeks[normalized]);
+    }
+
+    function ensureWeekUnlocked(weekVal, messagePrefix = 'Không thể thao tác') {
+      const normalizedWeek = normalizeWeekValue(weekVal);
+      if (!isWeekLocked(normalizedWeek)) return true;
+      showToast(`🔒 Tuần ${normalizedWeek} đã khóa sổ thi đua. ${messagePrefix}!`);
+      return false;
     }
 
     function getCurrentSchoolWeek() {
@@ -2032,8 +2040,7 @@ service cloud.firestore {
       const localToday = new Date(localDate.getTime() - tzOffset);
       const todayStr = localToday.toISOString().split('T')[0];
       const currentWeek = String(calculateSchoolParams(todayStr).week);
-      if (isWeekLocked(currentWeek)) {
-        showToast(`🔒 Tuần ${currentWeek} đã khóa sổ. Không thể ghi thêm vi phạm.`);
+      if (!ensureWeekUnlocked(currentWeek, 'Không thể ghi thêm vi phạm')) {
         activeStudentIndex = null;
         return;
       }
@@ -2070,8 +2077,7 @@ service cloud.firestore {
       }
 
       const weekVal = document.getElementById('violation-week').value;
-      if (isWeekLocked(weekVal)) {
-        showToast(`🔒 Tuần ${weekVal} đã khóa sổ thi đua. Không thể thêm vi phạm mới!`);
+      if (!ensureWeekUnlocked(weekVal, 'Không thể thêm vi phạm mới')) {
         return;
       }
       const monthVal = document.getElementById('violation-month').value;
@@ -2380,8 +2386,7 @@ service cloud.firestore {
 
     function deleteViolationLogPrompt(id) {
       const targetLog = violations.find(v => v.id === id);
-      if (targetLog && isWeekLocked(targetLog.week)) {
-        showToast(`🔒 Tuần ${targetLog.week} đã khóa sổ. Không thể chỉnh sửa lịch sử!`);
+      if (targetLog && !ensureWeekUnlocked(targetLog.week, 'Không thể chỉnh sửa lịch sử')) {
         return;
       }
       showConfirm(
@@ -2389,8 +2394,7 @@ service cloud.firestore {
         'Xóa bản ghi vi phạm này khỏi sổ rèn luyện học sinh và khôi phục điểm thi đua?',
         async () => {
           const currentLog = violations.find(v => v.id === id);
-          if (currentLog && isWeekLocked(currentLog.week)) {
-            showToast(`🔒 Tuần ${currentLog.week} đã khóa sổ. Không thể chỉnh sửa lịch sử!`);
+          if (currentLog && !ensureWeekUnlocked(currentLog.week, 'Không thể chỉnh sửa lịch sử')) {
             return;
           }
           violations = violations.filter(v => v.id !== id);
