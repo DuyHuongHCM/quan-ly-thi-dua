@@ -763,6 +763,8 @@ service cloud.firestore {
       violations: [],
       violationTypes: [...defaultViolationTypes],
       lockedWeeks: {},
+      activeTab: 'import',
+      isProgrammaticDropdownUpdate: false,
       currentGradeFilter: 0,
       currentWorkbook: null,
       currentRows: [],
@@ -962,6 +964,7 @@ service cloud.firestore {
         renderViolationLogs();
         generateReportPreview();
         lucide.createIcons();
+        switchTab(appState.activeTab);
         showToast('🔄 Dữ liệu rèn luyện vừa tự động đồng bộ thời gian thực!');
       }
     }
@@ -1241,35 +1244,40 @@ service cloud.firestore {
 
     // Populate standard dropdown selector options
     function initGlobalDropdowns() {
-      // 1. Select week dropdowns (Week 1 to Week 36)
-      const selects = ['violation-week', 'log-filter-week'];
-      selects.forEach(id => {
-        const el = document.getElementById(id);
-        if (!el) return;
-        
-        // Save initial selection if in logs
-        const origVal = el.value;
-        el.innerHTML = id === 'log-filter-week' ? '<option value="all">Tất cả các tuần</option>' : '';
-        for (let w = 1; w <= TOTAL_SCHOOL_WEEKS; w++) {
-          const opt = document.createElement('option');
-          opt.value = w;
-          opt.textContent = `Tuần ${w}`;
-          el.appendChild(opt);
-        }
-        if (origVal) el.value = origVal;
-      });
-      syncWeekLockButtonState();
-
-      // 2. Select rule dropdown in quick log modal
-      const ruleSelect = document.getElementById('violation-type-select');
-      if (ruleSelect) {
-        ruleSelect.innerHTML = '';
-        violationTypes.forEach(rule => {
-          const opt = document.createElement('option');
-          opt.value = rule.id;
-          opt.textContent = `[${rule.category}] ${rule.name} (-${rule.points}đ)`;
-          ruleSelect.appendChild(opt);
+      appState.isProgrammaticDropdownUpdate = true;
+      try {
+        // 1. Select week dropdowns (Week 1 to Week 36)
+        const selects = ['violation-week', 'log-filter-week'];
+        selects.forEach(id => {
+          const el = document.getElementById(id);
+          if (!el) return;
+          
+          // Save initial selection if in logs
+          const origVal = el.value;
+          el.innerHTML = id === 'log-filter-week' ? '<option value="all">Tất cả các tuần</option>' : '';
+          for (let w = 1; w <= TOTAL_SCHOOL_WEEKS; w++) {
+            const opt = document.createElement('option');
+            opt.value = w;
+            opt.textContent = `Tuần ${w}`;
+            el.appendChild(opt);
+          }
+          if (origVal) el.value = origVal;
         });
+        syncWeekLockButtonState();
+
+        // 2. Select rule dropdown in quick log modal
+        const ruleSelect = document.getElementById('violation-type-select');
+        if (ruleSelect) {
+          ruleSelect.innerHTML = '';
+          violationTypes.forEach(rule => {
+            const opt = document.createElement('option');
+            opt.value = rule.id;
+            opt.textContent = `[${rule.category}] ${rule.name} (-${rule.points}đ)`;
+            ruleSelect.appendChild(opt);
+          });
+        }
+      } finally {
+        appState.isProgrammaticDropdownUpdate = false;
       }
     }
 
@@ -1301,6 +1309,10 @@ service cloud.firestore {
     }
 
     function onViolationWeekChange(weekVal) {
+      if (appState.isProgrammaticDropdownUpdate) {
+        updateViolationModalLockState();
+        return;
+      }
       const dateEl = document.getElementById('violation-date');
       const monthEl = document.getElementById('violation-month');
       const semesterEl = document.getElementById('violation-semester');
@@ -1653,6 +1665,7 @@ service cloud.firestore {
     }
 
     function switchTab(tab) {
+      appState.activeTab = tab;
       ['import','search','rules','logs','report'].forEach(t => {
         document.getElementById(`panel-${t}`).classList.toggle('hidden', t !== tab);
         const btn = document.getElementById(`tab-${t}`);
@@ -2420,6 +2433,7 @@ service cloud.firestore {
       const tbody = document.getElementById('logs-table-body');
       const emptyView = document.getElementById('logs-empty-view');
       syncWeekLockButtonState();
+      if (appState.isProgrammaticDropdownUpdate) return;
       const filterWeek = document.getElementById('log-filter-week').value;
       const searchQ = document.getElementById('log-search-input').value.trim().toLowerCase();
       const normSearch = removeVietnameseTones(searchQ);
