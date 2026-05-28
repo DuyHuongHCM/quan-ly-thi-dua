@@ -787,17 +787,13 @@ service cloud.firestore {
         },
         set(value) {
           appState[name] = value;
-        }
+        },
+        enumerable: false,
+        configurable: false
       });
     }
 
-    [
-      'students', 'violations', 'violationTypes', 'lockedWeeks',
-      'currentGradeFilter', 'currentWorkbook', 'currentRows',
-      'searchLimit', 'filteredCache', 'isCloudMode',
-      'db', 'auth', 'userId', 'authUnsubscribe', 'isRealtimeLifecycleBound', 'confirmCallback',
-      'syncUnsubscribe', 'syncChannelCode', 'activeStudentIndex'
-    ].forEach(bindStateProperty);
+    Object.keys(appState).forEach(bindStateProperty);
 
     const appId = typeof window.__app_id !== 'undefined' ? window.__app_id : 'default-app-id';
 
@@ -1267,7 +1263,7 @@ service cloud.firestore {
     }
 
     function normalizeWeekValue(weekVal) {
-      const parsedWeek = parseInt(weekVal, 10);
+      const parsedWeek = parseInt(String(weekVal ?? ''), 10);
       return Number.isNaN(parsedWeek) ? '' : String(parsedWeek);
     }
 
@@ -2013,7 +2009,7 @@ service cloud.firestore {
             </div>
           </div>
           <div class="flex flex-col gap-1 ml-2 shrink-0">
-            <button onclick="openViolationModal(${realIdx})" ${currentWeekLocked ? 'disabled' : ''} class="${currentWeekLocked ? 'bg-slate-600 text-slate-300 cursor-not-allowed' : 'bg-red-600 hover:bg-red-500 text-white'} px-2.5 py-1.5 rounded-lg text-2xs font-extrabold flex items-center gap-1 shadow transition active:scale-95">
+            <button onclick="openViolationModal(${realIdx})" ${currentWeekLocked ? 'disabled title="Tuần hiện tại đã khóa sổ thi đua"' : ''} class="${currentWeekLocked ? 'bg-slate-600 text-slate-300 cursor-not-allowed' : 'bg-red-600 hover:bg-red-500 text-white'} px-2.5 py-1.5 rounded-lg text-2xs font-extrabold flex items-center gap-1 shadow transition active:scale-95">
               <i data-lucide="shield-alert" class="w-3.5 h-3.5"></i> Phạt lỗi
             </button>
             <button onclick="showDetail(${realIdx})" class="border border-slate-700/20 bg-slate-900/10 hover:bg-slate-900/20 text-slate-800 px-2.5 py-1.5 rounded-lg text-2xs font-bold transition active:scale-95 text-center">
@@ -2194,7 +2190,7 @@ service cloud.firestore {
         <div class="mt-4 pt-3 border-t border-slate-700 space-y-2">
           <div class="flex justify-between items-center">
             <h4 class="font-bold text-xs text-slate-300">Nhật ký vi phạm đã ghi nhận</h4>
-            <button onclick="closeDetail(); openViolationModal(${idx});" ${currentWeekLocked ? 'disabled' : ''} class="${currentWeekLocked ? 'bg-slate-700 border-slate-600 text-slate-400 cursor-not-allowed' : 'bg-red-900/40 border border-red-500/30 hover:bg-red-800/40 text-red-300'} text-3xs font-extrabold uppercase tracking-wide px-2 py-1 rounded">
+            <button onclick="closeDetail(); openViolationModal(${idx});" ${currentWeekLocked ? 'disabled title="Tuần hiện tại đã khóa sổ thi đua"' : ''} class="${currentWeekLocked ? 'bg-slate-700 border-slate-600 text-slate-400 cursor-not-allowed' : 'bg-red-900/40 border border-red-500/30 hover:bg-red-800/40 text-red-300'} text-3xs font-extrabold uppercase tracking-wide px-2 py-1 rounded">
               + Ghi lỗi nhanh
             </button>
           </div>
