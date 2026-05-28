@@ -351,7 +351,7 @@
              </div>
              <div>
                <label class="block text-xs font-bold text-slate-450 mb-1">Tuần học</label>
-               <select id="violation-week" class="w-full bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-red-500 cursor-pointer"></select>
+               <select id="violation-week" onchange="updateViolationModalLockState()" class="w-full bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-red-500 cursor-pointer"></select>
              </div>
            </div>
 
@@ -388,9 +388,12 @@
            </div>
          </div>
 
-         <div class="flex justify-end gap-2 pt-2 border-t border-slate-700">
+         <div class="flex items-center justify-between gap-2 pt-2 border-t border-slate-700">
+           <span id="violation-lock-warning" class="hidden text-[11px] font-semibold text-amber-300 bg-amber-900/40 border border-amber-700/40 rounded px-2 py-1">
+             Tuần này đã được khóa sổ thi đua
+           </span>
            <button onclick="closeViolationModal()" class="bg-slate-700 hover:bg-slate-600 text-slate-300 px-4 py-2 rounded-lg text-xs font-semibold">Hủy bỏ</button>
-           <button onclick="saveStudentViolation()" class="bg-red-600 hover:bg-red-500 text-white px-5 py-2 rounded-lg text-xs font-bold shadow-lg flex items-center gap-1.5 transition-all">
+           <button id="violation-save-btn" onclick="saveStudentViolation()" class="bg-red-600 hover:bg-red-500 text-white px-5 py-2 rounded-lg text-xs font-bold shadow-lg flex items-center gap-1.5 transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-red-600">
              <i data-lucide="check" class="w-3.5 h-3.5"></i> Xác nhận vi phạm
            </button>
          </div>
@@ -482,10 +485,14 @@
             </h3>
             <p class="text-xs text-slate-400 mt-0.5">Nơi lưu giữ, chỉnh sửa và quản lý lịch sử sai sót của học sinh</p>
           </div>
-          <div class="flex items-center gap-2">
+          <div class="flex flex-wrap items-center gap-2">
             <select id="log-filter-week" onchange="renderViolationLogs()" class="bg-slate-700 text-xs border border-slate-600 rounded px-2.5 py-1.5 text-white focus:outline-none cursor-pointer">
               <option value="all">Tất cả các tuần</option>
             </select>
+            <button id="lock-week-btn" onclick="toggleWeekLock()" class="bg-amber-600 hover:bg-amber-500 text-white px-3 py-1.5 rounded text-xs font-bold shadow transition active:scale-95 flex items-center gap-1.5">
+              <i data-lucide="lock" class="w-3.5 h-3.5"></i>
+              <span id="lock-week-btn-text">Khóa tuần</span>
+            </button>
             <input type="text" id="log-search-input" oninput="renderViolationLogs()" placeholder="Tìm tên HS, lớp..." class="bg-slate-700 text-xs border border-slate-600 rounded px-2.5 py-1.5 text-white focus:outline-none placeholder-slate-400 w-44">
           </div>
         </div>
@@ -739,11 +746,8 @@ service cloud.firestore {
   </div>
 
   <script>
-    let students = [];
-    let violations = [];
-    
     // Default system rules/violation types 
-    let violationTypes = [
+    const defaultViolationTypes = [
       { id: 'rule_1', name: 'Đi học muộn (sau hồi trống báo)', points: 2, category: 'Chuyên cần' },
       { id: 'rule_2', name: 'Không đeo khăn quàng / Phù hiệu / Bảng tên', points: 1, category: 'Đồng phục' },
       { id: 'rule_3', name: 'Không học bài, chuẩn bị bài hoặc thiếu dụng cụ', points: 2, category: 'Học tập' },
@@ -754,29 +758,44 @@ service cloud.firestore {
       { id: 'rule_8', name: 'Nói bậy / Đùa nghịch thô bạo gây gổ', points: 5, category: 'Đạo đức' }
     ];
 
-    let currentGradeFilter = 0;
-    let currentWorkbook = null;
-    let currentRows = [];
-    
-    // Virtual render parameters
-    let searchLimit = 40; 
-    let filteredCache = [];
+    const appState = {
+      students: [],
+      violations: [],
+      violationTypes: [...defaultViolationTypes],
+      lockedWeeks: {},
+      currentGradeFilter: 0,
+      currentWorkbook: null,
+      currentRows: [],
+      searchLimit: 40,
+      filteredCache: [],
+      isCloudMode: false,
+      db: null,
+      auth: null,
+      userId: null,
+      authUnsubscribe: null,
+      isRealtimeLifecycleBound: false,
+      confirmCallback: null,
+      syncUnsubscribe: null,
+      syncChannelCode: localStorage.getItem("find_hs_sync_channel") || "PDH_2026",
+      activeStudentIndex: null
+    };
 
-    // Storage mode indicator
-    let isCloudMode = false;
+    function bindStateProperty(name) {
+      Object.defineProperty(window, name, {
+        get() {
+          return appState[name];
+        },
+        set(value) {
+          appState[name] = value;
+        },
+        enumerable: false,
+        configurable: true
+      });
+    }
 
-    // Cloud Database references
-    let db = null;
-    let auth = null;
-    let userId = null;
+    Object.keys(appState).forEach(bindStateProperty);
+
     const appId = typeof window.__app_id !== 'undefined' ? window.__app_id : 'default-app-id';
-
-    // Global Confirm Callback holder
-    let confirmCallback = null;
-
-    // Realtime Sync Room Engine (Rule 1 Compliance)
-    let syncUnsubscribe = null;
-    let syncChannelCode = localStorage.getItem("find_hs_sync_channel") || "PDH_2026";
 
     // ----------------------------------------------------
     // INDEXEDDB LOCAL BACKUP ENGINE (FOR OFFLINE STABILITY)
@@ -879,7 +898,8 @@ service cloud.firestore {
           await window.FirebaseSDK.signInAnonymously(auth);
         }
 
-        window.FirebaseSDK.onAuthStateChanged(auth, async (user) => {
+        if (authUnsubscribe) authUnsubscribe();
+        authUnsubscribe = window.FirebaseSDK.onAuthStateChanged(auth, async (user) => {
           if (user) {
             userId = user.uid;
             isCloudMode = true;
@@ -887,6 +907,7 @@ service cloud.firestore {
             
             // Start listening to the shared sync room real-time!
             startRealtimeSync();
+            bindRealtimeLifecycleHandlers();
           }
         });
       } catch (err) {
@@ -902,9 +923,52 @@ service cloud.firestore {
     }
 
     // Real-time synchronization of shared school emulation room (Rule 1 Strict Path)
+    function stopRealtimeSync() {
+      if (typeof syncUnsubscribe === 'function') {
+        syncUnsubscribe();
+      }
+      syncUnsubscribe = null;
+    }
+
+    function applyRemoteState(data) {
+      let hasChanged = false;
+
+      if (JSON.stringify(students) !== JSON.stringify(data.students || [])) {
+        students = data.students || [];
+        precalculateKeys(students);
+        hasChanged = true;
+      }
+      if (JSON.stringify(violations) !== JSON.stringify(data.violations || [])) {
+        violations = data.violations || [];
+        hasChanged = true;
+      }
+      if (JSON.stringify(violationTypes) !== JSON.stringify(data.violationTypes || [])) {
+        violationTypes = data.violationTypes || [];
+        hasChanged = true;
+      }
+
+      const remoteLockedWeeks = (data.lockedWeeks && typeof data.lockedWeeks === 'object') ? data.lockedWeeks : {};
+      if (JSON.stringify(lockedWeeks) !== JSON.stringify(remoteLockedWeeks)) {
+        lockedWeeks = remoteLockedWeeks;
+        hasChanged = true;
+      }
+
+      if (hasChanged) {
+        updateStats();
+        doSearch(document.getElementById('search-input').value);
+        initGlobalDropdowns();
+        onReportTargetChange();
+        renderRules();
+        renderViolationLogs();
+        generateReportPreview();
+        lucide.createIcons();
+        showToast('🔄 Dữ liệu rèn luyện vừa tự động đồng bộ thời gian thực!');
+      }
+    }
+
     function startRealtimeSync() {
       if (!db || !isCloudMode) return;
-      if (syncUnsubscribe) syncUnsubscribe();
+      stopRealtimeSync();
 
       const docRef = window.FirebaseSDK.doc(db, 'artifacts', appId, 'public', 'data', 'emulation_saves', syncChannelCode);
       
@@ -912,34 +976,7 @@ service cloud.firestore {
         if (docSnap.exists()) {
           const data = docSnap.data();
           if (data.updatedAt) {
-            let hasChanged = false;
-            
-            // De-serialize and verify state changes
-            if (JSON.stringify(students) !== JSON.stringify(data.students || [])) {
-              students = data.students || [];
-              precalculateKeys(students);
-              hasChanged = true;
-            }
-            if (JSON.stringify(violations) !== JSON.stringify(data.violations || [])) {
-              violations = data.violations || [];
-              hasChanged = true;
-            }
-            if (JSON.stringify(violationTypes) !== JSON.stringify(data.violationTypes || [])) {
-              violationTypes = data.violationTypes || [];
-              hasChanged = true;
-            }
-
-            if (hasChanged) {
-              updateStats();
-              doSearch(document.getElementById('search-input').value);
-              initGlobalDropdowns();
-              onReportTargetChange();
-              renderRules();
-              renderViolationLogs();
-              generateReportPreview();
-              lucide.createIcons();
-              showToast('🔄 Dữ liệu rèn luyện vừa tự động đồng bộ thời gian thực!');
-            }
+            applyRemoteState(data);
           }
         } else {
           // If Firestore room is fresh, initialize it with current active local data immediately
@@ -955,6 +992,7 @@ service cloud.firestore {
         `;
         lucide.createIcons();
       }, (err) => {
+        stopRealtimeSync();
         console.error("Realtime sync channel rejected:", err);
         document.getElementById('system-mode-text').innerHTML = `
           <span class="text-rose-400 font-bold flex items-center gap-1 cursor-pointer" onclick="showFirebaseTroubleshoot()">
@@ -962,6 +1000,29 @@ service cloud.firestore {
           </span>
         `;
         lucide.createIcons();
+      });
+    }
+
+    function bindRealtimeLifecycleHandlers() {
+      if (isRealtimeLifecycleBound) return;
+      isRealtimeLifecycleBound = true;
+
+      document.addEventListener('visibilitychange', () => {
+        if (document.hidden) {
+          stopRealtimeSync();
+          return;
+        }
+        if (isCloudMode) {
+          startRealtimeSync();
+        }
+      });
+
+      window.addEventListener('beforeunload', () => {
+        stopRealtimeSync();
+        if (authUnsubscribe) {
+          authUnsubscribe();
+          authUnsubscribe = null;
+        }
       });
     }
 
@@ -979,6 +1040,9 @@ service cloud.firestore {
           }
           if (storedState.violations) {
             violations = storedState.violations;
+          }
+          if (storedState.lockedWeeks && typeof storedState.lockedWeeks === 'object') {
+            lockedWeeks = storedState.lockedWeeks;
           }
           
           if (storedState.status === "working") {
@@ -1026,6 +1090,7 @@ service cloud.firestore {
           students: cleanStudents,
           violations: violations,
           violationTypes: violationTypes,
+          lockedWeeks: lockedWeeks,
           updatedAt: nowStr,
           status: statusValue
         });
@@ -1041,6 +1106,7 @@ service cloud.firestore {
           students: cleanStudents,
           violations: violations,
           violationTypes: violationTypes,
+          lockedWeeks: lockedWeeks,
           updatedAt: nowStr
         });
       } catch (err) {
@@ -1146,6 +1212,7 @@ service cloud.firestore {
         }
         if (origVal) el.value = origVal;
       });
+      syncWeekLockButtonState();
 
       // 2. Select rule dropdown in quick log modal
       const ruleSelect = document.getElementById('violation-type-select');
@@ -1192,6 +1259,90 @@ service cloud.firestore {
       document.getElementById('violation-week').value = params.week;
       document.getElementById('violation-month').value = params.month;
       document.getElementById('violation-semester').value = params.semester;
+      updateViolationModalLockState();
+    }
+
+    function normalizeWeekValue(weekVal) {
+      const parsedWeek = parseInt(String(weekVal ?? ''), 10);
+      return Number.isNaN(parsedWeek) ? '' : String(parsedWeek);
+    }
+
+    function isWeekLocked(weekVal) {
+      const normalized = normalizeWeekValue(weekVal);
+      return !!(normalized && lockedWeeks && lockedWeeks[normalized]);
+    }
+
+    function ensureWeekUnlocked(weekVal, messagePrefix = 'Không thể thao tác') {
+      const normalizedWeek = normalizeWeekValue(weekVal);
+      if (!isWeekLocked(normalizedWeek)) return true;
+      showToast(`🔒 Tuần ${normalizedWeek} đã khóa sổ thi đua. ${messagePrefix}.`);
+      return false;
+    }
+
+    function getCurrentSchoolWeek() {
+      const localDate = new Date();
+      const tzOffset = localDate.getTimezoneOffset() * 60000;
+      const localToday = new Date(localDate.getTime() - tzOffset);
+      return String(calculateSchoolParams(localToday.toISOString().split('T')[0]).week);
+    }
+
+    function syncWeekLockButtonState() {
+      const btn = document.getElementById('lock-week-btn');
+      const txt = document.getElementById('lock-week-btn-text');
+      const filterWeek = document.getElementById('log-filter-week');
+      if (!btn || !txt || !filterWeek) return;
+
+      const week = normalizeWeekValue(filterWeek.value);
+      if (!week) {
+        btn.disabled = true;
+        btn.className = 'bg-slate-600 text-slate-300 px-3 py-1.5 rounded text-xs font-bold shadow cursor-not-allowed flex items-center gap-1.5';
+        txt.textContent = 'Chọn tuần để khóa';
+        return;
+      }
+
+      const locked = isWeekLocked(week);
+      btn.disabled = false;
+      btn.className = locked
+        ? 'bg-emerald-600 hover:bg-emerald-500 text-white px-3 py-1.5 rounded text-xs font-bold shadow transition active:scale-95 flex items-center gap-1.5'
+        : 'bg-amber-600 hover:bg-amber-500 text-white px-3 py-1.5 rounded text-xs font-bold shadow transition active:scale-95 flex items-center gap-1.5';
+      txt.textContent = locked ? `Mở khóa Tuần ${week}` : `Khóa Tuần ${week}`;
+    }
+
+    function updateViolationModalLockState() {
+      const weekEl = document.getElementById('violation-week');
+      const saveBtn = document.getElementById('violation-save-btn');
+      const warningEl = document.getElementById('violation-lock-warning');
+      if (!weekEl || !saveBtn || !warningEl) return;
+
+      const locked = isWeekLocked(weekEl.value);
+      saveBtn.disabled = locked;
+      warningEl.classList.toggle('hidden', !locked);
+    }
+
+    async function toggleWeekLock() {
+      const filterWeek = document.getElementById('log-filter-week').value;
+      const week = normalizeWeekValue(filterWeek);
+      if (!week) {
+        showToast('❌ Vui lòng chọn tuần cụ thể trước khi khóa sổ!');
+        return;
+      }
+
+      const nextLockedWeeks = { ...lockedWeeks };
+      if (nextLockedWeeks[week]) {
+        delete nextLockedWeeks[week];
+        lockedWeeks = nextLockedWeeks;
+        await saveAutosaveToCloud();
+        showToast(`✓ Đã mở khóa sổ thi đua Tuần ${week}.`);
+      } else {
+        nextLockedWeeks[week] = true;
+        lockedWeeks = nextLockedWeeks;
+        await saveAutosaveToCloud();
+        showToast(`🔒 Đã khóa sổ thi đua Tuần ${week}.`);
+      }
+
+      syncWeekLockButtonState();
+      updateViolationModalLockState();
+      renderViolationLogs();
     }
 
     // Populate dummy emulation state
@@ -1280,6 +1431,7 @@ service cloud.firestore {
             note: 'Quên đeo thẻ học sinh'
           }
         ];
+        lockedWeeks = {};
 
         precalculateKeys(students);
         
@@ -1319,7 +1471,8 @@ service cloud.firestore {
             return rest;
           }),
           violations: violations,
-          violationTypes: violationTypes
+          violationTypes: violationTypes,
+          lockedWeeks: lockedWeeks
         };
         const blob = new Blob([JSON.stringify(backupData, null, 2)], { type: 'application/json' });
         const url = URL.createObjectURL(blob);
@@ -1358,6 +1511,11 @@ service cloud.firestore {
             }
             if (Array.isArray(parsed.violations)) {
               violations = parsed.violations;
+            }
+            if (parsed.lockedWeeks && typeof parsed.lockedWeeks === 'object') {
+              lockedWeeks = parsed.lockedWeeks;
+            } else {
+              lockedWeeks = {};
             }
             
             showProgressLoader(true, 80, "Đang biên dịch lại khóa tìm kiếm...", "Tối ưu hóa bộ nhớ đệm");
@@ -1404,6 +1562,7 @@ service cloud.firestore {
     async function clearData() {
       students = [];
       violations = [];
+      lockedWeeks = {};
       currentWorkbook = null;
       currentRows = [];
       
@@ -1810,6 +1969,7 @@ service cloud.firestore {
       
       fontAwesomePatch.innerHTML = paginated.map((s) => {
         const realIdx = students.indexOf(s);
+        const currentWeekLocked = isWeekLocked(getCurrentSchoolWeek());
         
         // Highlight logic
         let highlightedName = s.name;
@@ -1849,7 +2009,7 @@ service cloud.firestore {
             </div>
           </div>
           <div class="flex flex-col gap-1 ml-2 shrink-0">
-            <button onclick="openViolationModal(${realIdx})" class="bg-red-600 hover:bg-red-500 text-white px-2.5 py-1.5 rounded-lg text-2xs font-extrabold flex items-center gap-1 shadow transition active:scale-95">
+            <button onclick="openViolationModal(${realIdx})" ${currentWeekLocked ? 'disabled title="Tuần hiện tại đã khóa sổ thi đua"' : ''} class="${currentWeekLocked ? 'bg-slate-600 text-slate-300 cursor-not-allowed' : 'bg-red-600 hover:bg-red-500 text-white'} px-2.5 py-1.5 rounded-lg text-2xs font-extrabold flex items-center gap-1 shadow transition active:scale-95">
               <i data-lucide="shield-alert" class="w-3.5 h-3.5"></i> Phạt lỗi
             </button>
             <button onclick="showDetail(${realIdx})" class="border border-slate-700/20 bg-slate-900/10 hover:bg-slate-900/20 text-slate-800 px-2.5 py-1.5 rounded-lg text-2xs font-bold transition active:scale-95 text-center">
@@ -1863,7 +2023,6 @@ service cloud.firestore {
     }
 
     // Violation logging trigger
-    let activeStudentIndex = null;
     function openViolationModal(idx) {
       activeStudentIndex = idx;
       const s = students[idx];
@@ -1876,6 +2035,11 @@ service cloud.firestore {
       const tzOffset = localDate.getTimezoneOffset() * 60000;
       const localToday = new Date(localDate.getTime() - tzOffset);
       const todayStr = localToday.toISOString().split('T')[0];
+      const currentWeek = String(calculateSchoolParams(todayStr).week);
+      if (!ensureWeekUnlocked(currentWeek, 'Không thể ghi thêm vi phạm')) {
+        activeStudentIndex = null;
+        return;
+      }
       
       document.getElementById('violation-date').value = todayStr;
       document.getElementById('violation-note').value = '';
@@ -1909,6 +2073,9 @@ service cloud.firestore {
       }
 
       const weekVal = document.getElementById('violation-week').value;
+      if (!ensureWeekUnlocked(weekVal, 'Không thể thêm vi phạm mới')) {
+        return;
+      }
       const monthVal = document.getElementById('violation-month').value;
       const semVal = document.getElementById('violation-semester').value;
       const noteVal = document.getElementById('violation-note').value.trim();
@@ -1958,6 +2125,7 @@ service cloud.firestore {
       // Gather history
       const studentHist = violations.filter(v => v.studentName === s.name && v.studentClass === s.class);
       const totalPoints = studentHist.reduce((sum, v) => sum + parseFloat(v.points || 0), 0);
+      const currentWeekLocked = isWeekLocked(getCurrentSchoolWeek());
       
       let historyHtml = `
         <div class="text-xs text-slate-500 italic py-4 text-center">Gương mẫu rèn luyện tốt, chưa có lỗi vi phạm.</div>
@@ -2022,7 +2190,7 @@ service cloud.firestore {
         <div class="mt-4 pt-3 border-t border-slate-700 space-y-2">
           <div class="flex justify-between items-center">
             <h4 class="font-bold text-xs text-slate-300">Nhật ký vi phạm đã ghi nhận</h4>
-            <button onclick="closeDetail(); openViolationModal(${idx});" class="bg-red-900/40 border border-red-500/30 hover:bg-red-800/40 text-red-300 text-3xs font-extrabold uppercase tracking-wide px-2 py-1 rounded">
+            <button onclick="closeDetail(); openViolationModal(${idx});" ${currentWeekLocked ? 'disabled title="Tuần hiện tại đã khóa sổ thi đua"' : ''} class="${currentWeekLocked ? 'bg-slate-700 border-slate-600 text-slate-400 cursor-not-allowed' : 'bg-red-900/40 border border-red-500/30 hover:bg-red-800/40 text-red-300'} text-3xs font-extrabold uppercase tracking-wide px-2 py-1 rounded">
               + Ghi lỗi nhanh
             </button>
           </div>
@@ -2158,6 +2326,7 @@ service cloud.firestore {
     function renderViolationLogs() {
       const tbody = document.getElementById('logs-table-body');
       const emptyView = document.getElementById('logs-empty-view');
+      syncWeekLockButtonState();
       const filterWeek = document.getElementById('log-filter-week').value;
       const searchQ = document.getElementById('log-search-input').value.trim().toLowerCase();
       const normSearch = removeVietnameseTones(searchQ);
@@ -2198,9 +2367,13 @@ service cloud.firestore {
           </td>
           <td class="py-3 px-2 text-slate-400 italic text-2xs truncate max-w-[120px]" title="${v.note || ''}">${v.note || '-'}</td>
           <td class="py-3 px-2 text-center">
-            <button onclick="deleteViolationLogPrompt('${v.id}')" class="p-1 rounded bg-slate-900 hover:bg-rose-950/40 text-rose-500 transition" title="Xóa ghi chép">
-              <i data-lucide="trash" class="w-3.5 h-3.5"></i>
-            </button>
+            ${
+              isWeekLocked(v.week)
+                ? `<span class="inline-flex items-center gap-1 px-2 py-1 rounded bg-amber-900/40 border border-amber-700/30 text-amber-300 text-3xs font-bold"><i data-lucide="lock" class="w-3 h-3"></i>Đã khóa</span>`
+                : `<button onclick="deleteViolationLogPrompt('${v.id}')" class="p-1 rounded bg-slate-900 hover:bg-rose-950/40 text-rose-500 transition" title="Xóa ghi chép">
+                    <i data-lucide="trash" class="w-3.5 h-3.5"></i>
+                  </button>`
+            }
           </td>
         </tr>
       `).join('');
@@ -2212,6 +2385,10 @@ service cloud.firestore {
         'Xóa bản ghi lỗi',
         'Xóa bản ghi vi phạm này khỏi sổ rèn luyện học sinh và khôi phục điểm thi đua?',
         async () => {
+          const currentLog = violations.find(v => v.id === id);
+          if (currentLog && !ensureWeekUnlocked(currentLog.week, 'Không thể chỉnh sửa lịch sử')) {
+            return;
+          }
           violations = violations.filter(v => v.id !== id);
           await saveAutosaveToCloud();
           renderViolationLogs();
@@ -2939,6 +3116,7 @@ service cloud.firestore {
       
       // Re-trigger auth sync on new channel room
       if (isCloudMode) {
+        stopRealtimeSync();
         startRealtimeSync();
       }
       closeQrModal();
