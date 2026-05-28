@@ -390,7 +390,7 @@
 
          <div class="flex items-center justify-between gap-2 pt-2 border-t border-slate-700">
            <span id="violation-lock-warning" class="hidden text-[11px] font-semibold text-amber-300 bg-amber-900/40 border border-amber-700/40 rounded px-2 py-1">
-             Tuần này đã khóa sổ thi đua
+             Tuần này đã được khóa sổ thi đua
            </span>
            <button onclick="closeViolationModal()" class="bg-slate-700 hover:bg-slate-600 text-slate-300 px-4 py-2 rounded-lg text-xs font-semibold">Hủy bỏ</button>
            <button id="violation-save-btn" onclick="saveStudentViolation()" class="bg-red-600 hover:bg-red-500 text-white px-5 py-2 rounded-lg text-xs font-bold shadow-lg flex items-center gap-1.5 transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-red-600">
@@ -789,7 +789,7 @@ service cloud.firestore {
           appState[name] = value;
         },
         enumerable: false,
-        configurable: false
+        configurable: true
       });
     }
 
@@ -1275,7 +1275,7 @@ service cloud.firestore {
     function ensureWeekUnlocked(weekVal, messagePrefix = 'Không thể thao tác') {
       const normalizedWeek = normalizeWeekValue(weekVal);
       if (!isWeekLocked(normalizedWeek)) return true;
-      showToast(`🔒 Tuần ${normalizedWeek} đã khóa sổ thi đua. ${messagePrefix}!`);
+      showToast(`🔒 Tuần ${normalizedWeek} đã khóa sổ thi đua. ${messagePrefix}.`);
       return false;
     }
 
@@ -2381,10 +2381,6 @@ service cloud.firestore {
     }
 
     function deleteViolationLogPrompt(id) {
-      const targetLog = violations.find(v => v.id === id);
-      if (targetLog && !ensureWeekUnlocked(targetLog.week, 'Không thể chỉnh sửa lịch sử')) {
-        return;
-      }
       showConfirm(
         'Xóa bản ghi lỗi',
         'Xóa bản ghi vi phạm này khỏi sổ rèn luyện học sinh và khôi phục điểm thi đua?',
