@@ -869,7 +869,7 @@ service cloud.firestore {
     }
 
     function parseTimestampToMs(value) {
-      if (!value || typeof value !== 'string') return null;
+      if (value == null || typeof value !== 'string') return null;
       const parsed = Date.parse(value);
       return Number.isNaN(parsed) ? null : parsed;
     }
@@ -962,7 +962,7 @@ service cloud.firestore {
     function applyRemoteState(data) {
       const remoteTs = parseTimestampToMs(data.updatedAt);
       const localTs = parseTimestampToMs(appState.lastUpdatedAt);
-      if (remoteTs === null || (localTs !== null && remoteTs <= localTs)) return;
+      if (remoteTs === null || (localTs !== null && remoteTs < localTs)) return;
 
       appState.lastUpdatedAt = data.updatedAt;
       let hasChanged = false;
