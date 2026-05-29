@@ -70,7 +70,7 @@
     window.dispatchEvent(new Event('firebase-sdk-ready'));
   </script>
  </head>
- <body class="h-full bg-slate-900 text-white overflow-auto flex flex-col">
+ <body class="h-full flex flex-col overflow-hidden bg-slate-900 text-white">
 
   <!-- Incident & Crash Warning Banner -->
   <div id="incident-banner" class="hidden bg-gradient-to-r from-amber-600 to-red-600 p-4 shadow-xl border-b border-amber-500 text-white z-40">
@@ -651,7 +651,7 @@
         
         <!-- Generated QR Code Image -->
         <div class="bg-white p-4 rounded-xl inline-block shadow-inner mx-auto">
-          <img id="qr-code-img" src="" alt="Mã QR liên kết" class="w-48 h-48 block">
+          <img id="qr-code-img" src="" alt="Mã QR liên kết" class="w-48 h-48 min-w-[192px] min-h-[192px] max-w-full object-contain mx-auto block rounded-lg">
         </div>
 
         <div class="bg-slate-900 rounded-lg p-2.5 text-2xs font-mono text-indigo-300 break-all select-all flex items-center justify-between gap-2 border border-slate-700">
@@ -780,7 +780,8 @@ service cloud.firestore {
       confirmCallback: null,
       syncUnsubscribe: null,
       syncChannelCode: localStorage.getItem("find_hs_sync_channel") || "PDH_2026",
-      activeStudentIndex: null
+      activeStudentIndex: null,
+      lastUpdatedAt: null
     };
 
     function bindStateProperty(name) {
@@ -867,6 +868,31 @@ service cloud.firestore {
       }
     }
 
+    function parseTimestampToMs(value) {
+      if (!value || typeof value !== 'string') return null;
+      const parsed = Date.parse(value);
+      return Number.isNaN(parsed) ? null : parsed;
+    }
+
+    function hasRealtimeDataset(state) {
+      return !!(
+        state &&
+        ((Array.isArray(state.students) && state.students.length > 0) ||
+         (Array.isArray(state.violations) && state.violations.length > 0))
+      );
+    }
+
+    function shouldBlockEmptyOverwrite(nextState, currentState) {
+      if (!nextState || !currentState) return false;
+      if (hasRealtimeDataset(nextState) || !hasRealtimeDataset(currentState)) return false;
+
+      const currentTs = parseTimestampToMs(currentState.updatedAt);
+      const nextTs = parseTimestampToMs(nextState.updatedAt);
+      if (currentTs === null) return false;
+      if (nextTs === null) return true;
+      return currentTs > nextTs;
+    }
+
     // ----------------------------------------------------
     // INITIALIZATION & SYNCHRONIZATION ENGINES (CLOUDMYNC 3.0)
     // ----------------------------------------------------
@@ -934,6 +960,11 @@ service cloud.firestore {
     }
 
     function applyRemoteState(data) {
+      const remoteTs = parseTimestampToMs(data.updatedAt);
+      const localTs = parseTimestampToMs(appState.lastUpdatedAt);
+      if (remoteTs === null || (localTs !== null && remoteTs <= localTs)) return;
+
+      appState.lastUpdatedAt = data.updatedAt;
       let hasChanged = false;
 
       if (JSON.stringify(students) !== JSON.stringify(data.students || [])) {
@@ -976,16 +1007,34 @@ service cloud.firestore {
 
       const docRef = window.FirebaseSDK.doc(db, 'artifacts', appId, 'public', 'data', 'emulation_saves', syncChannelCode);
       
-      syncUnsubscribe = window.FirebaseSDK.onSnapshot(docRef, (docSnap) => {
+      syncUnsubscribe = window.FirebaseSDK.onSnapshot(docRef, async (docSnap) => {
         if (docSnap.exists()) {
           const data = docSnap.data();
           if (data.updatedAt) {
             applyRemoteState(data);
           }
         } else {
-          // If Firestore room is fresh, initialize it with current active local data immediately
-          if (students.length > 0 || violations.length > 0) {
-            saveAutosaveToCloud();
+          const offlineState = await getLocalItem("autosave_state_emu");
+          const hasOfflineData = hasRealtimeDataset(offlineState);
+          const offlineTs = parseTimestampToMs(offlineState && offlineState.updatedAt);
+          if (hasOfflineData && offlineTs !== null) {
+            if (!hasRealtimeDataset({ students, violations })) {
+              students = Array.isArray(offlineState.students) ? offlineState.students : [];
+              violations = Array.isArray(offlineState.violations) ? offlineState.violations : [];
+              violationTypes = Array.isArray(offlineState.violationTypes) && offlineState.violationTypes.length > 0 ? offlineState.violationTypes : [...defaultViolationTypes];
+              lockedWeeks = (offlineState.lockedWeeks && typeof offlineState.lockedWeeks === 'object') ? offlineState.lockedWeeks : {};
+              precalculateKeys(students);
+              updateStats();
+              doSearch(document.getElementById('search-input').value);
+              initGlobalDropdowns();
+              onReportTargetChange();
+              renderRules();
+              renderViolationLogs();
+              generateReportPreview();
+              lucide.createIcons();
+            }
+            appState.lastUpdatedAt = offlineState.updatedAt;
+            await saveAutosaveToCloud();
           }
         }
 
@@ -1048,6 +1097,9 @@ service cloud.firestore {
           if (storedState.lockedWeeks && typeof storedState.lockedWeeks === 'object') {
             lockedWeeks = storedState.lockedWeeks;
           }
+          if (parseTimestampToMs(storedState.updatedAt) !== null) {
+            appState.lastUpdatedAt = storedState.updatedAt;
+          }
           
           if (storedState.status === "working") {
             const dateStr = storedState.updatedAt ? new Date(storedState.updatedAt).toLocaleTimeString('vi-VN') + ' ' + new Date(storedState.updatedAt).toLocaleDateString('vi-VN') : 'vừa qua';
@@ -1088,31 +1140,46 @@ service cloud.firestore {
         return rest;
       });
 
+      const hasCurrentData = cleanStudents.length > 0 || violations.length > 0;
+      const baseUpdatedAt = parseTimestampToMs(appState.lastUpdatedAt) !== null ? appState.lastUpdatedAt : nowStr;
+      const nextUpdatedAt = hasCurrentData ? nowStr : baseUpdatedAt;
+      const savePayload = {
+        students: cleanStudents,
+        violations: violations,
+        violationTypes: violationTypes,
+        lockedWeeks: lockedWeeks,
+        updatedAt: nextUpdatedAt,
+        status: statusValue
+      };
+
+      if (hasCurrentData) {
+        appState.lastUpdatedAt = nextUpdatedAt;
+      }
+
+      let shouldWriteLocal = true;
+      const currentLocalState = await getLocalItem("autosave_state_emu");
+      if (shouldBlockEmptyOverwrite(savePayload, currentLocalState)) {
+        shouldWriteLocal = false;
+      }
+
       // 1. Always back up to local IndexedDB (Highly stable, takes 0.001s)
-      try {
-        await setLocalItem("autosave_state_emu", {
-          students: cleanStudents,
-          violations: violations,
-          violationTypes: violationTypes,
-          lockedWeeks: lockedWeeks,
-          updatedAt: nowStr,
-          status: statusValue
-        });
-      } catch (e) {
-        console.error("Local IndexDB write failed:", e);
+      if (shouldWriteLocal) {
+        try {
+          await setLocalItem("autosave_state_emu", savePayload);
+        } catch (e) {
+          console.error("Local IndexDB write failed:", e);
+        }
       }
 
       // 2. Write to Cloud Firestore if connected (Rule 1 Strict Path - Shared public emulation room)
       if (!isCloudMode || !db) return;
       try {
         const docRef = window.FirebaseSDK.doc(db, 'artifacts', appId, 'public', 'data', 'emulation_saves', syncChannelCode);
-        await window.FirebaseSDK.setDoc(docRef, {
-          students: cleanStudents,
-          violations: violations,
-          violationTypes: violationTypes,
-          lockedWeeks: lockedWeeks,
-          updatedAt: nowStr
-        });
+        const docSnap = await window.FirebaseSDK.getDoc(docRef);
+        if (docSnap.exists() && shouldBlockEmptyOverwrite(savePayload, docSnap.data())) {
+          return;
+        }
+        await window.FirebaseSDK.setDoc(docRef, savePayload);
       } catch (err) {
         console.error("Cloud autosave rejected:", err);
       }
@@ -3180,10 +3247,10 @@ service cloud.firestore {
       }
 
       // Encode URL and trigger beautiful stable free QR API 
-      const qrApiUrl = `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(window.location.href)}`;
+      const qrApiUrl = `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(activeUrl)}`;
       
       img.src = qrApiUrl;
-      urlText.textContent = window.location.href;
+      urlText.textContent = activeUrl;
       syncInput.value = syncChannelCode;
 
       modal.classList.remove('hidden');
