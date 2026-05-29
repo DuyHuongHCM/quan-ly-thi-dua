@@ -1369,10 +1369,40 @@ service cloud.firestore {
 
     function onViolationDateChange(val) {
       if (!val) return;
+      const dateEl = document.getElementById('violation-date');
+      const weekEl = document.getElementById('violation-week');
+      const monthEl = document.getElementById('violation-month');
+      const semesterEl = document.getElementById('violation-semester');
+      if (!dateEl || !weekEl || !monthEl || !semesterEl) return;
+
+      const selectedDate = parseDateInputValue(val);
+      if (!Number.isNaN(selectedDate.getTime())) {
+        const day = selectedDate.getDay();
+        if (day === 0 || day === 6) {
+          const selectedWeek = weekEl.value || String(calculateSchoolParams(val).week);
+          const resetWeekStart = getWeekStartDateFromWeekNumber(selectedWeek, val);
+          const resetDateStr = formatDateInputValue(resetWeekStart);
+          dateEl.value = resetDateStr;
+
+          const resetWeekEnd = new Date(resetWeekStart);
+          resetWeekEnd.setDate(resetWeekStart.getDate() + 4);
+          dateEl.min = resetDateStr;
+          dateEl.max = formatDateInputValue(resetWeekEnd);
+
+          const resetParams = calculateSchoolParams(resetDateStr);
+          weekEl.value = resetParams.week;
+          monthEl.value = resetParams.month;
+          semesterEl.value = resetParams.semester;
+          updateViolationModalLockState();
+          showToast('❌ Ngày vi phạm phải nằm trong tuần học (Từ Thứ 2 đến Thứ 6)!');
+          return;
+        }
+      }
+
       const params = calculateSchoolParams(val);
-      document.getElementById('violation-week').value = params.week;
-      document.getElementById('violation-month').value = params.month;
-      document.getElementById('violation-semester').value = params.semester;
+      weekEl.value = params.week;
+      monthEl.value = params.month;
+      semesterEl.value = params.semester;
       updateViolationModalLockState();
     }
 
@@ -1388,7 +1418,12 @@ service cloud.firestore {
       if (!dateEl || !monthEl || !semesterEl || !weekEl) return;
 
       const weekStart = getWeekStartDateFromWeekNumber(weekVal, dateEl.value);
+      const weekEnd = new Date(weekStart);
+      weekEnd.setDate(weekStart.getDate() + 4);
       const weekDateStr = formatDateInputValue(weekStart);
+      const weekEndStr = formatDateInputValue(weekEnd);
+      dateEl.min = weekDateStr;
+      dateEl.max = weekEndStr;
       dateEl.value = weekDateStr;
 
       const params = calculateSchoolParams(weekDateStr);
