@@ -2571,7 +2571,7 @@ service cloud.firestore {
       const filterWeek = document.getElementById('log-filter-week').value;
       const searchQ = document.getElementById('log-search-input').value.trim().toLowerCase();
       const normSearch = removeVietnameseTones(searchQ);
-      const currentFilterKey = `${filterWeek}__${normSearch}`;
+      const currentFilterKey = JSON.stringify({ filterWeek, normSearch });
 
       if (currentFilterKey !== lastLogsFilterKey) {
         logsHistoryExpanded = false;
