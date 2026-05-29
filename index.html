@@ -520,6 +520,11 @@
             <i data-lucide="file-check-2" class="w-10 h-10 mx-auto text-slate-600"></i>
             <p class="font-semibold text-slate-400 text-xs">Không phát hiện lượt vi phạm nào trùng khớp với bộ lọc</p>
           </div>
+          <div id="logs-history-footer" class="hidden py-3 text-center">
+            <button onclick="expandViolationLogsHistory()" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-700 hover:bg-slate-600 text-slate-200 text-xs font-semibold transition">
+              <i data-lucide="history" class="w-3.5 h-3.5"></i> Xem thêm lịch sử...
+            </button>
+          </div>
         </div>
       </div>
     </div>
@@ -547,6 +552,7 @@
              <select id="report-type-select" onchange="onReportTypeChange()" class="w-full bg-slate-700 border border-slate-600 rounded-lg px-2.5 py-2 text-sm text-white focus:outline-none focus:border-indigo-500 cursor-pointer font-bold">
                <option value="students">Danh sách lý lịch học sinh</option>
                <option value="emulation">Báo cáo thi đua khối lớp</option>
+               <option value="violations">Báo cáo tổng hợp vi phạm học sinh</option>
              </select>
            </div>
 
@@ -583,11 +589,12 @@
            <!-- SUB-CONTAINER FOR EMULATION CALCULATION (NEW) -->
            <div id="sub-report-emulation" class="hidden space-y-3">
              <div class="space-y-2">
-               <label class="block text-xs text-slate-450">Phạm vi thời gian thi đua:</label>
+               <label class="block text-xs text-slate-450">Phạm vi thời gian báo cáo:</label>
                <select id="emu-scope-type" onchange="onEmuScopeTypeChange()" class="w-full bg-slate-700 border border-slate-600 rounded-lg px-2.5 py-2 text-xs text-white focus:outline-none focus:border-indigo-500 cursor-pointer">
                  <option value="week">Xếp hạng theo Tuần</option>
                  <option value="month">Xếp hạng theo Tháng</option>
                  <option value="semester">Xếp hạng theo Học kỳ</option>
+                 <option value="year">Xếp hạng theo Cả năm</option>
                </select>
              </div>
 
@@ -603,16 +610,18 @@
              <i data-lucide="file-spreadsheet" class="w-5 h-5"></i> Xuất Excel Bản Đẹp 
            </button>
            <button onclick="printReport()" class="w-full bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-500 hover:to-blue-500 py-3 rounded-xl font-bold transition shadow-lg flex items-center justify-center gap-2 hover:-translate-y-0.5 active:translate-y-0 text-sm"> 
-             <i data-lucide="printer" class="w-5 h-5"></i> In báo cáo ngay (Khổ A4)
+             <i data-lucide="printer" class="w-5 h-5"></i> In báo cáo ngay
            </button>
-           <p class="text-slate-400 text-2xs text-center italic mt-1">Gợi ý: Phiên bản in sẽ tự động căn lề giấy sạch đẹp, ẩn toàn bộ nút bấm.</p>
+           <button onclick="shareReportToZalo()" class="w-full bg-gradient-to-r from-indigo-500 to-blue-500 hover:from-indigo-400 hover:to-blue-400 py-3 rounded-xl font-bold transition shadow-lg flex items-center justify-center gap-2 hover:-translate-y-0.5 active:translate-y-0 text-sm">
+             <i data-lucide="share-2" class="w-5 h-5"></i> Chia sẻ báo cáo qua Zalo
+           </button>
          </div>
        </div>
 
        <!-- Live Sheet Document Preview -->
        <div class="lg:col-span-3 space-y-2">
          <h4 class="font-bold text-sm text-slate-300 flex items-center gap-1.5">
-           <i data-lucide="eye" class="w-4 h-4 text-emerald-400"></i> 2. Bản xem trước trang in (Khổ A4 chuẩn học đường)
+           <i data-lucide="eye" class="w-4 h-4 text-emerald-400"></i> 2. Bản xem trước trang in
          </h4>
          <div class="bg-white text-slate-900 rounded-xl p-6 shadow-2xl overflow-x-auto min-h-[600px] border border-slate-200">
            <!-- Page Paper Container -->
@@ -1266,6 +1275,10 @@ service cloud.firestore {
 
     const TOTAL_SCHOOL_WEEKS = 36;
     const WEEK_ONE_SPLIT = 18;
+    const LOGS_PAGE_SIZE = 12;
+
+    let logsHistoryExpanded = false;
+    let lastLogsFilterKey = '';
 
     function parseDateInputValue(dateStr) {
       const m = String(dateStr || '').match(/^(\d{4})-(\d{2})-(\d{2})$/);
@@ -2534,15 +2547,36 @@ service cloud.firestore {
     // ----------------------------------------------------
     // VIOLATION LEDGER LOGS TAB ENGINE (NEW)
     // ----------------------------------------------------
+    function buildRepeatedViolationMap(scopeViolations) {
+      const repeatMap = {};
+      scopeViolations.forEach(v => {
+        const key = `${v.studentName}|${v.studentClass}`;
+        repeatMap[key] = (repeatMap[key] || 0) + 1;
+      });
+      return repeatMap;
+    }
+
+    function expandViolationLogsHistory() {
+      logsHistoryExpanded = true;
+      renderViolationLogs();
+    }
+
     function renderViolationLogs() {
       const tbody = document.getElementById('logs-table-body');
       const emptyView = document.getElementById('logs-empty-view');
+      const historyFooter = document.getElementById('logs-history-footer');
       syncWeekLockButtonState();
       // Skip log filtering rerender when dropdown values are being set programmatically.
       if (appState.isProgrammaticDropdownUpdate) return;
       const filterWeek = document.getElementById('log-filter-week').value;
       const searchQ = document.getElementById('log-search-input').value.trim().toLowerCase();
       const normSearch = removeVietnameseTones(searchQ);
+      const currentFilterKey = JSON.stringify({ filterWeek, normSearch });
+
+      if (currentFilterKey !== lastLogsFilterKey) {
+        logsHistoryExpanded = false;
+        lastLogsFilterKey = currentFilterKey;
+      }
 
       let filteredLogs = violations.filter(v => {
         const matchWeek = (filterWeek === 'all') || (v.week === filterWeek);
@@ -2559,17 +2593,26 @@ service cloud.firestore {
       if (filteredLogs.length === 0) {
         tbody.innerHTML = '';
         emptyView.classList.remove('hidden');
+        historyFooter.classList.add('hidden');
         return;
       }
       emptyView.classList.add('hidden');
+      const repeatedMap = buildRepeatedViolationMap(filteredLogs);
+      const shouldSlice = !logsHistoryExpanded && filteredLogs.length > LOGS_PAGE_SIZE;
+      const visibleLogs = shouldSlice ? filteredLogs.slice(0, LOGS_PAGE_SIZE) : filteredLogs;
+      historyFooter.classList.toggle('hidden', !shouldSlice);
 
-      tbody.innerHTML = filteredLogs.map(v => `
-        <tr class="hover:bg-slate-700/30">
+      tbody.innerHTML = visibleLogs.map(v => {
+        const key = `${v.studentName}|${v.studentClass}`;
+        const repeatedCount = repeatedMap[key] || 0;
+        const isRepeated = repeatedCount >= 3;
+        return `
+        <tr class="hover:bg-slate-700/30 ${isRepeated ? 'bg-red-950/35' : ''}">
           <td class="py-3 px-2 text-slate-400 text-2xs font-mono">
             ${new Date(v.date).toLocaleDateString('vi-VN')}<br>
             <span class="text-indigo-400">T. ${v.week} • ${v.semester}</span>
           </td>
-          <td class="py-3 px-2 font-bold text-slate-100">${v.studentName}</td>
+          <td class="py-3 px-2 font-bold text-slate-100">${v.studentName}${isRepeated ? ' <span class="text-rose-300 text-2xs">⚠️ [Tái phạm nhiều lần]</span>' : ''}</td>
           <td class="py-3 px-2 text-center">
             <span class="bg-indigo-950 text-indigo-300 font-bold px-2 py-0.5 rounded border border-indigo-900/30 text-[10px]">${v.studentClass}</span>
           </td>
@@ -2589,7 +2632,8 @@ service cloud.firestore {
             }
           </td>
         </tr>
-      `).join('');
+      `;
+      }).join('');
       lucide.createIcons();
     }
 
@@ -2665,13 +2709,31 @@ service cloud.firestore {
     function onReportTypeChange() {
       const type = document.getElementById('report-type-select').value;
       document.getElementById('sub-report-students').classList.toggle('hidden', type !== 'students');
-      document.getElementById('sub-report-emulation').classList.toggle('hidden', type !== 'emulation');
+      document.getElementById('sub-report-emulation').classList.toggle('hidden', !['emulation', 'violations'].includes(type));
       
-      if (type === 'emulation') {
+      if (type === 'emulation' || type === 'violations') {
         onEmuScopeTypeChange();
       } else {
         generateReportPreview();
       }
+    }
+
+    function getScopeViolations(scopeType, scopeValue) {
+      return violations.filter(v => {
+        if (scopeType === 'week') return v.week === scopeValue;
+        if (scopeType === 'month') return v.month === scopeValue;
+        if (scopeType === 'semester') return v.semester === scopeValue;
+        if (scopeType === 'year') return true;
+        return true;
+      });
+    }
+
+    function getScopeLabel(scopeType, scopeValue) {
+      if (scopeType === 'week') return `Tuần ${scopeValue}`;
+      if (scopeType === 'month') return `Tháng ${scopeValue}`;
+      if (scopeType === 'semester') return `${scopeValue}`;
+      if (scopeType === 'year') return 'Cả năm';
+      return scopeValue;
     }
 
     // Dynamic populated parameters in Emulation time frame selections
@@ -2709,6 +2771,11 @@ service cloud.firestore {
           opt.textContent = o;
           scopeValSelect.appendChild(opt);
         });
+      } else if (scopeType === 'year') {
+        const opt = document.createElement('option');
+        opt.value = 'all';
+        opt.textContent = 'Cả năm học';
+        scopeValSelect.appendChild(opt);
       }
 
       generateReportPreview();
@@ -2831,7 +2898,7 @@ service cloud.firestore {
             </div>
           </div>
         `;
-      } else {
+      } else if (reportType === 'emulation') {
         // Render 2: Collective Class Emulation Board Score Grouped by Grade and Sorted internally (NEW)
         const scopeType = document.getElementById('emu-scope-type').value;
         const scopeValueEl = document.getElementById('emu-scope-value');
@@ -2853,12 +2920,7 @@ service cloud.firestore {
         allClasses.sort(compareClassNames);
 
         // 2. Filter violations inside designated scope
-        const scopeViolations = violations.filter(v => {
-          if (scopeType === 'week') return v.week === scopeValue;
-          if (scopeType === 'month') return v.month === scopeValue;
-          if (scopeType === 'semester') return v.semester === scopeValue;
-          return true;
-        });
+        const scopeViolations = getScopeViolations(scopeType, scopeValue);
 
         // 3. Score calculation
         let classEmuList = allClasses.map(className => {
@@ -2960,21 +3022,22 @@ service cloud.firestore {
 
         // 5. Gather top individual infractions for the emulation section
         let studentViolMap = {};
+        const repeatedMap = buildRepeatedViolationMap(scopeViolations);
         scopeViolations.forEach(v => {
           const k = `${v.studentName} (${v.studentClass})`;
           if (!studentViolMap[k]) {
-            studentViolMap[k] = { name: v.studentName, class: v.studentClass, pts: 0, count: 0 };
+            studentViolMap[k] = { name: v.studentName, class: v.studentClass, pts: 0, count: 0, isRepeated: false };
           }
           studentViolMap[k].pts += parseFloat(v.points || 0);
           studentViolMap[k].count += 1;
+          studentViolMap[k].isRepeated = (repeatedMap[`${v.studentName}|${v.studentClass}`] || 0) >= 3;
         });
         
         let seriousInfractions = Object.values(studentViolMap);
         seriousInfractions.sort((a,b) => b.pts - a.pts);
 
-        let scopeTitle = `BÁO CÁO THI ĐUA TẬP THỂ - TUẦN ${scopeValue}`;
-        if (scopeType === 'month') scopeTitle = `BÁO CÁO THI ĐUA TẬP THỂ - THÁNG ${scopeValue}`;
-        if (scopeType === 'semester') scopeTitle = `BÁO CÁO THI ĐUA TẬP THỂ - KHU VỰC: ${scopeValue}`;
+        const scopeText = getScopeLabel(scopeType, scopeValue);
+        let scopeTitle = `BÁO CÁO THI ĐUA TẬP THỂ - ${scopeText.toUpperCase()}`;
 
         previewContainer.innerHTML = `
           <div class="border-b-2 border-slate-800 pb-4 flex justify-between items-start">
@@ -3031,9 +3094,9 @@ service cloud.firestore {
                 </thead>
                 <tbody>
                   ${seriousInfractions.slice(0, 5).map((inf, idx) => `
-                    <tr>
+                    <tr class="${inf.isRepeated ? 'bg-red-50' : ''}">
                       <td class="border border-slate-400 p-2 text-center">${idx + 1}</td>
-                      <td class="border border-slate-400 p-2 font-bold">${inf.name}</td>
+                      <td class="border border-slate-400 p-2 font-bold">${inf.name}${inf.isRepeated ? ' ⚠️ [Tái phạm nhiều lần]' : ''}</td>
                       <td class="border border-slate-400 p-2 text-center font-semibold">${inf.class}</td>
                       <td class="border border-slate-400 p-2 text-center">${inf.count} lần</td>
                       <td class="border border-slate-400 p-2 text-center font-extrabold text-red-600">-${inf.pts}đ</td>
@@ -3042,6 +3105,106 @@ service cloud.firestore {
                 </tbody>
               </table>
               <p class="text-[8px] text-slate-500 italic">* Lưu ý: Danh sách này thống kê các học sinh có tổng điểm trừ cao nhất, yêu cầu GVCN phối hợp chặt chẽ với phụ huynh để có biện pháp nhắc nhở.</p>
+            `}
+          </div>
+
+          <div class="grid grid-cols-2 pt-8 text-center text-[10px] gap-6 text-slate-900">
+            <div class="space-y-1">
+              <p class="font-semibold uppercase">Hiệu trưởng phê duyệt</p>
+              <p class="text-[9px] text-slate-400 italic">(Ký tên và đóng dấu)</p>
+              <div class="h-16"></div>
+              <p class="font-bold">BAN GIÁM HIỆU</p>
+            </div>
+            <div class="space-y-1">
+              <p class="italic text-slate-600">${dateString}</p>
+              <p class="font-semibold uppercase">Tổng phụ trách Đội lập</p>
+              <p class="text-[9px] text-slate-400 italic">(Ký, ghi rõ họ tên)</p>
+              <div class="h-16"></div>
+            </div>
+          </div>
+        `;
+      } else {
+        const scopeType = document.getElementById('emu-scope-type').value;
+        const scopeValueEl = document.getElementById('emu-scope-value');
+        const scopeValue = scopeValueEl ? scopeValueEl.value : '';
+
+        if (!scopeValue) {
+          previewContainer.innerHTML = `
+            <div class="text-center py-20 text-slate-400 space-y-3">
+              <i data-lucide="list-x" class="w-16 h-16 mx-auto text-slate-300"></i>
+              <p class="text-sm font-semibold text-slate-500">Chưa có đủ thông tin hoặc mốc thời gian để kết xuất báo cáo vi phạm.</p>
+            </div>
+          `;
+          lucide.createIcons();
+          return;
+        }
+
+        const scopeViolations = getScopeViolations(scopeType, scopeValue);
+        const repeatedMap = buildRepeatedViolationMap(scopeViolations);
+        const studentSummaryMap = {};
+
+        scopeViolations.forEach(v => {
+          const key = `${v.studentName}|${v.studentClass}`;
+          if (!studentSummaryMap[key]) {
+            studentSummaryMap[key] = { name: v.studentName, class: v.studentClass, count: 0, pts: 0 };
+          }
+          studentSummaryMap[key].count += 1;
+          studentSummaryMap[key].pts += parseFloat(v.points || 0);
+        });
+
+        const studentSummary = Object.values(studentSummaryMap)
+          .map(item => ({
+            ...item,
+            isRepeated: (repeatedMap[`${item.name}|${item.class}`] || 0) >= 3
+          }))
+          .sort((a, b) => b.count - a.count || b.pts - a.pts || compareClassNames(a.class, b.class));
+
+        const scopeText = getScopeLabel(scopeType, scopeValue);
+        previewContainer.innerHTML = `
+          <div class="border-b-2 border-slate-800 pb-4 flex justify-between items-start">
+            <div class="text-center space-y-0.5">
+              <div class="font-semibold uppercase tracking-wide text-[10px]">ỦY BAN NHÂN DÂN PHƯỜNG BÌNH TIÊN</div>
+              <div class="font-bold uppercase tracking-wider text-xs text-indigo-900">TRƯỜNG THCS PHẠM ĐÌNH HỔ</div>
+            </div>
+            <div class="text-center space-y-0.5">
+              <div class="font-bold text-[10px] text-slate-800">CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM</div>
+              <div class="font-semibold text-[9px] text-slate-700 underline">Độc lập - Tự do - Hạnh phúc</div>
+            </div>
+          </div>
+
+          <div class="text-center py-4">
+            <h2 class="text-base font-black tracking-wide text-slate-900">BÁO CÁO TỔNG HỢP VI PHẠM HỌC SINH - ${scopeText.toUpperCase()}</h2>
+            <p class="text-[9px] italic text-slate-500 mt-1">Năm học: 2025 - 2026 • Tổng lượt vi phạm: ${scopeViolations.length} • Tổng số học sinh vi phạm: ${studentSummary.length}</p>
+          </div>
+
+          <div class="space-y-2">
+            ${studentSummary.length === 0 ? `
+              <p class="text-[9px] text-slate-500 italic">Không ghi nhận học sinh vi phạm trong mốc thời gian đã chọn.</p>
+            ` : `
+              <table class="w-full border-collapse border border-slate-400 text-[10px] text-slate-900">
+                <thead>
+                  <tr class="bg-red-50 text-slate-950 font-bold">
+                    <th class="border border-slate-400 p-2 text-center w-[8%]">STT</th>
+                    <th class="border border-slate-400 p-2 text-left w-[35%]">Họ và tên</th>
+                    <th class="border border-slate-400 p-2 text-center w-[12%]">Lớp</th>
+                    <th class="border border-slate-400 p-2 text-center w-[15%]">Số lần vi phạm</th>
+                    <th class="border border-slate-400 p-2 text-center w-[15%]">Tổng điểm trừ</th>
+                    <th class="border border-slate-400 p-2 text-center w-[15%]">Cảnh báo</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  ${studentSummary.map((item, idx) => `
+                    <tr class="${item.isRepeated ? 'bg-red-50' : ''}">
+                      <td class="border border-slate-400 p-2 text-center">${idx + 1}</td>
+                      <td class="border border-slate-400 p-2 font-bold">${item.name}${item.isRepeated ? ' ⚠️ [Tái phạm nhiều lần]' : ''}</td>
+                      <td class="border border-slate-400 p-2 text-center font-semibold">${item.class}</td>
+                      <td class="border border-slate-400 p-2 text-center">${item.count}</td>
+                      <td class="border border-slate-400 p-2 text-center font-extrabold text-red-600">-${item.pts}đ</td>
+                      <td class="border border-slate-400 p-2 text-center">${item.isRepeated ? '⚠️ Cần theo dõi' : '-'}</td>
+                    </tr>
+                  `).join('')}
+                </tbody>
+              </table>
             `}
           </div>
 
@@ -3153,7 +3316,7 @@ service cloud.firestore {
         }
         XLSX.writeFile(wb, filename);
 
-      } else {
+      } else if (reportType === 'emulation') {
         // Export collective class emulation board score grouped by grade and sorted internally
         const scopeType = document.getElementById('emu-scope-type').value;
         const scopeValue = document.getElementById('emu-scope-value').value;
@@ -3161,12 +3324,7 @@ service cloud.firestore {
         let allClasses = [...new Set(students.map(s => s.class))];
         allClasses.sort(compareClassNames);
 
-        const scopeViolations = violations.filter(v => {
-          if (scopeType === 'week') return v.week === scopeValue;
-          if (scopeType === 'month') return v.month === scopeValue;
-          if (scopeType === 'semester') return v.semester === scopeValue;
-          return true;
-        });
+        const scopeViolations = getScopeViolations(scopeType, scopeValue);
 
         let classEmuList = allClasses.map(className => {
           const classViolations = scopeViolations.filter(v => v.studentClass === className);
@@ -3213,10 +3371,10 @@ service cloud.firestore {
           });
         });
 
-        const labelMap = { 'week': 'Tuần', 'month': 'Tháng', 'semester': 'Học kỳ' };
+        const labelMap = { 'week': 'Tuần', 'month': 'Tháng', 'semester': 'Học kỳ', 'year': 'Cả năm' };
         const wsData = [
           ['TRƯỜNG THCS PHẠM ĐÌNH HỔ - BAN THI ĐUA'],
-          [`BẢNG ĐIỂM THI ĐUA TẬP THỂ LỚP - ${labelMap[scopeType].toUpperCase()} ${scopeValue}`],
+          [`BẢNG ĐIỂM THI ĐUA TẬP THỂ LỚP - ${getScopeLabel(scopeType, scopeValue).toUpperCase()}`],
           [`Thời gian xuất bản: ${new Date().toLocaleDateString('vi-VN')}`],
           [],
           ['Hạng', 'Lớp học', 'Số vi phạm rèn luyện', 'Điểm thi đua bị trừ', 'Điểm thi đua chung', 'Xếp loại chung']
@@ -3260,9 +3418,88 @@ service cloud.firestore {
 
         XLSX.utils.book_append_sheet(wb, ws, 'Báo Cáo Thi Đua');
         XLSX.writeFile(wb, `BaoCao_ThiDua_TapThe_${labelMap[scopeType]}_${scopeValue}.xlsx`);
+      } else {
+        const scopeType = document.getElementById('emu-scope-type').value;
+        const scopeValue = document.getElementById('emu-scope-value').value;
+        const scopeText = getScopeLabel(scopeType, scopeValue);
+        const scopeViolations = getScopeViolations(scopeType, scopeValue);
+        const repeatedMap = buildRepeatedViolationMap(scopeViolations);
+        const studentSummaryMap = {};
+
+        scopeViolations.forEach(v => {
+          const key = `${v.studentName}|${v.studentClass}`;
+          if (!studentSummaryMap[key]) {
+            studentSummaryMap[key] = { name: v.studentName, class: v.studentClass, count: 0, pts: 0 };
+          }
+          studentSummaryMap[key].count += 1;
+          studentSummaryMap[key].pts += parseFloat(v.points || 0);
+        });
+
+        const studentSummary = Object.values(studentSummaryMap)
+          .map(item => ({
+            ...item,
+            isRepeated: (repeatedMap[`${item.name}|${item.class}`] || 0) >= 3
+          }))
+          .sort((a, b) => b.count - a.count || b.pts - a.pts || compareClassNames(a.class, b.class));
+
+        const wsData = [
+          ['TRƯỜNG THCS PHẠM ĐÌNH HỔ - BAN THI ĐUA'],
+          [`BÁO CÁO TỔNG HỢP VI PHẠM HỌC SINH - ${scopeText.toUpperCase()}`],
+          [`Tổng lượt vi phạm: ${scopeViolations.length} • Tổng số học sinh vi phạm: ${studentSummary.length}`],
+          [`Thời gian xuất bản: ${new Date().toLocaleDateString('vi-VN')}`],
+          [],
+          ['STT', 'Họ và tên học sinh', 'Lớp', 'Số lần vi phạm', 'Tổng điểm trừ', 'Cảnh báo']
+        ];
+
+        studentSummary.forEach((item, idx) => {
+          wsData.push([
+            idx + 1,
+            item.name,
+            item.class,
+            item.count,
+            -item.pts,
+            item.isRepeated ? '⚠️ Tái phạm nhiều lần (>= 3)' : ''
+          ]);
+        });
+
+        const ws = XLSX.utils.aoa_to_sheet(wsData);
+        ws['!cols'] = [
+          { wch: 8 }, { wch: 30 }, { wch: 12 }, { wch: 18 }, { wch: 16 }, { wch: 28 }
+        ];
+        ws['!merges'] = [
+          { s: { r: 0, c: 0 }, e: { r: 0, c: 5 } },
+          { s: { r: 1, c: 0 }, e: { r: 1, c: 5 } },
+          { s: { r: 2, c: 0 }, e: { r: 2, c: 5 } },
+          { s: { r: 3, c: 0 }, e: { r: 3, c: 5 } }
+        ];
+
+        XLSX.utils.book_append_sheet(wb, ws, 'Bao Cao Vi Pham');
+        XLSX.writeFile(wb, `BaoCao_TongHop_ViPham_${scopeText.replace(/\s+/g, '_')}.xlsx`);
       }
 
       showToast('✓ Đã xuất file báo cáo Excel thành công!');
+    }
+
+    function shareReportToZalo() {
+      const reportType = document.getElementById('report-type-select').value;
+      if (reportType === 'students') {
+        showToast('ℹ️ Hãy chọn báo cáo thi đua hoặc tổng hợp vi phạm để chia sẻ nhanh qua Zalo.');
+        return;
+      }
+
+      const scopeType = document.getElementById('emu-scope-type').value;
+      const scopeValue = document.getElementById('emu-scope-value').value;
+      const scopeViolations = getScopeViolations(scopeType, scopeValue);
+      const studentSet = new Set(scopeViolations.map(v => `${v.studentName}|${v.studentClass}`));
+      const scopeText = getScopeLabel(scopeType, scopeValue);
+      const title = reportType === 'violations'
+        ? 'Báo cáo tổng hợp vi phạm học sinh'
+        : 'Báo cáo thi đua khối lớp';
+
+      const note = `${title} - ${scopeText}. Tổng số học sinh vi phạm: ${studentSet.size}. Tổng lượt vi phạm: ${scopeViolations.length}.`;
+      const shareUrl = `https://zalo.me/share?url=${encodeURIComponent(window.location.href)}&note=${encodeURIComponent(note)}`;
+      window.open(shareUrl, '_blank');
+      showToast('✓ Đã mở cửa sổ chia sẻ báo cáo qua Zalo!');
     }
 
     // ----------------------------------------------------
