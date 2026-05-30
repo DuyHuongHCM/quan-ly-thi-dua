@@ -3248,15 +3248,15 @@ service cloud.firestore {
       window.print();
     }
 
-    // Export beautiful styled excel spreadsheet matching selection parameters
-    function exportReport() {
+    function generateExcelFileBlob() {
       if (!students.length) { 
         showToast('❌ Chưa có dữ liệu để xuất file!'); 
-        return; 
+        return null; 
       }
 
       const reportType = document.getElementById('report-type-select').value;
       const wb = XLSX.utils.book_new();
+      let filename = '';
 
       if (reportType === 'students') {
         const selectedGrade = document.getElementById('report-grade-select').value;
@@ -3317,13 +3317,12 @@ service cloud.firestore {
 
         XLSX.utils.book_append_sheet(wb, ws, 'Báo cáo Học Sinh');
         
-        let filename = 'BaoCao_LyLich_HocSinh.xlsx';
+        filename = 'BaoCao_LyLich_HocSinh.xlsx';
         if (selectedClass !== 'all') {
           filename = `Danh_Sach_Hoc_Sinh_Lop_${selectedClass}.xlsx`;
         } else if (selectedGrade !== 'all') {
           filename = `Danh_Sach_Hoc_Sinh_Khoi_${selectedGrade}.xlsx`;
         }
-        XLSX.writeFile(wb, filename);
 
       } else if (reportType === 'emulation') {
         // Export collective class emulation board score grouped by grade and sorted internally
@@ -3426,7 +3425,7 @@ service cloud.firestore {
         ];
 
         XLSX.utils.book_append_sheet(wb, ws, 'Báo Cáo Thi Đua');
-        XLSX.writeFile(wb, `BaoCao_ThiDua_TapThe_${labelMap[scopeType]}_${scopeValue}.xlsx`);
+        filename = `BaoCao_ThiDua_TapThe_${labelMap[scopeType]}_${scopeValue}.xlsx`;
       } else {
         const scopeType = document.getElementById('emu-scope-type').value;
         const scopeValue = document.getElementById('emu-scope-value').value;
@@ -3483,9 +3482,28 @@ service cloud.firestore {
         ];
 
         XLSX.utils.book_append_sheet(wb, ws, 'Bao Cao Vi Pham');
-        XLSX.writeFile(wb, `BaoCao_TongHop_ViPham_${scopeText.replace(/\s+/g, '_')}.xlsx`);
+        filename = `BaoCao_TongHop_ViPham_${scopeText.replace(/\s+/g, '_')}.xlsx`;
       }
 
+      const wbout = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
+      const blob = new Blob([wbout], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+      const file = new File([blob], filename, { type: blob.type });
+      return file;
+    }
+
+    // Export beautiful styled excel spreadsheet matching selection parameters
+    function exportReport() {
+      const file = generateExcelFileBlob();
+      if (!file) return;
+
+      const fileUrl = URL.createObjectURL(file);
+      const link = document.createElement('a');
+      link.href = fileUrl;
+      link.download = file.name;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(fileUrl);
       showToast('✓ Đã xuất file báo cáo Excel thành công!');
     }
 
@@ -3496,19 +3514,20 @@ service cloud.firestore {
         return;
       }
 
-      const scopeType = document.getElementById('emu-scope-type').value;
-      const scopeValue = document.getElementById('emu-scope-value').value;
-      const scopeViolations = getScopeViolations(scopeType, scopeValue);
-      const studentSet = new Set(scopeViolations.map(v => `${v.studentName}|${v.studentClass}`));
-      const scopeText = getScopeLabel(scopeType, scopeValue);
-      const title = reportType === 'violations'
-        ? 'Báo cáo tổng hợp vi phạm học sinh'
-        : 'Báo cáo thi đua khối lớp';
+      const file = generateExcelFileBlob();
+      if (!file) return;
 
-      const note = `${title} - ${scopeText}. Tổng số học sinh vi phạm: ${studentSet.size}. Tổng lượt vi phạm: ${scopeViolations.length}.`;
-      const shareUrl = `https://zalo.me/share?url=${encodeURIComponent(window.location.href)}&note=${encodeURIComponent(note)}`;
-      window.open(shareUrl, '_blank');
-      showToast('✓ Đã mở cửa sổ chia sẻ báo cáo qua Zalo!');
+      if (navigator.canShare && navigator.canShare({ files: [file] })) {
+        navigator.share({
+          files: [file],
+          title: 'Báo cáo vi phạm thi đua rèn luyện',
+          text: 'Gửi kết quả tổng hợp thi đua trường THCS Phạm Đình Hổ'
+        })
+        .then(() => showToast('✓ Đã mở khay chia sẻ Zalo thành công!'))
+        .catch((err) => console.log('Hủy chia sẻ:', err));
+      } else {
+        showToast('⚠️ Thiết bị/trình duyệt chưa hỗ trợ chia sẻ tệp trực tiếp.');
+      }
     }
 
     // ----------------------------------------------------
