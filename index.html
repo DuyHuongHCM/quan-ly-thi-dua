@@ -8,16 +8,12 @@
   <script src="https://cdn.jsdelivr.net/npm/lucide@0.263.0/dist/umd/lucide.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
   <script>
-    // Chủ động bỏ tải element_sdk.js để tránh 404; fallback này giữ ứng dụng không bị dừng nếu có lời gọi ElementSDK.
+    // Chủ động không tải element_sdk.js để tránh 404; fallback này giữ ứng dụng không bị lỗi nếu có lời gọi ElementSDK.
     if (!window.ElementSDK) {
       console.warn('⚠️ element_sdk.js không khả dụng. Hệ thống đang dùng fallback tương thích.');
+      const elementSdkNoop = () => {};
       window.ElementSDK = new Proxy({}, {
-        get(target, key) {
-          if (!target[key]) {
-            target[key] = () => console.warn(`⚠️ ElementSDK.${String(key)} không khả dụng trong fallback mode.`);
-          }
-          return target[key];
-        }
+        get(target, prop) { return elementSdkNoop; }
       });
     }
   </script>
@@ -625,7 +621,7 @@
            <button onclick="printReport()" class="w-full bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-500 hover:to-blue-500 py-3 rounded-xl font-bold transition shadow-lg flex items-center justify-center gap-2 hover:-translate-y-0.5 active:translate-y-0 text-sm"> 
              <i data-lucide="printer" class="w-5 h-5"></i> In báo cáo ngay
            </button>
-           <button onclick="shareReportToZalo()" aria-label="Chia sẻ báo cáo qua Zalo" class="w-full bg-gradient-to-r from-[#0084ff] to-[#0068ff] hover:from-[#0f92ff] hover:to-[#0b72ff] py-3 rounded-xl font-bold transition shadow-lg flex items-center justify-center gap-2 hover:-translate-y-0.5 active:translate-y-0 text-sm">
+           <button onclick="shareReportToZalo()" class="w-full bg-gradient-to-r from-[#0084ff] to-[#0068ff] hover:from-[#0f92ff] hover:to-[#0b72ff] py-3 rounded-xl font-bold transition shadow-lg flex items-center justify-center gap-2 hover:-translate-y-0.5 active:translate-y-0 text-sm">
              <i data-lucide="share-2" class="w-5 h-5"></i> Chia sẻ qua Zalo
            </button>
          </div>
