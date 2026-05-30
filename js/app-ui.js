@@ -1,4 +1,4 @@
-    // Default system rules/violation types 
+    // Default system rules/violation types
     const defaultViolationTypes = [
       { id: 'rule_1', name: 'Đi học muộn (sau hồi trống báo)', points: 2, category: 'Chuyên cần' },
       { id: 'rule_2', name: 'Không đeo khăn quàng / Phù hiệu / Bảng tên', points: 1, category: 'Đồng phục' },
@@ -50,7 +50,6 @@
     }
 
     Object.keys(appState).forEach(bindStateProperty);
-    window.appState = appState;
     window.defaultViolationTypes = defaultViolationTypes;
 
     const appId = typeof window.__app_id !== 'undefined' ? window.__app_id : 'default-app-id';
@@ -2703,11 +2702,15 @@
 
     // Runs on ready (Kiểm tra cả hai trường hợp Firebase module sẵn sàng sớm hay muộn)
     let firebaseInitRequested = false;
-    function bootstrapFirebaseApp() {
+    function bootstrapFirebaseApp(retryCount = 0) {
       if (firebaseInitRequested) return;
       if (window.FirebaseDB && typeof window.FirebaseDB.initFirebase === 'function') {
         firebaseInitRequested = true;
         window.FirebaseDB.initFirebase();
+        return;
+      }
+      if (retryCount < 50) {
+        setTimeout(() => bootstrapFirebaseApp(retryCount + 1), 100);
       }
     }
 

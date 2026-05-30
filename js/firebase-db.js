@@ -95,12 +95,11 @@ function stopRealtimeSync() {
 }
 
 function applyRemoteState(data) {
-  const appState = window.appState || {};
   const remoteTs = parseTimestampToMs(data.updatedAt);
-  const localTs = parseTimestampToMs(appState.lastUpdatedAt);
+  const localTs = parseTimestampToMs(window.lastUpdatedAt);
   if (remoteTs === null || (localTs !== null && remoteTs < localTs)) return;
 
-  appState.lastUpdatedAt = data.updatedAt;
+  window.lastUpdatedAt = data.updatedAt;
   let hasChanged = false;
 
   if (JSON.stringify(window.students) !== JSON.stringify(data.students || [])) {
@@ -132,7 +131,7 @@ function applyRemoteState(data) {
     window.renderViolationLogs?.();
     window.generateReportPreview?.();
     window.lucide?.createIcons?.();
-    window.switchTab?.(appState.activeTab);
+    window.switchTab?.(window.activeTab);
     window.showToast?.('🔄 Dữ liệu rèn luyện vừa tự động đồng bộ thời gian thực!');
   }
 }
@@ -171,9 +170,7 @@ function startRealtimeSync() {
           window.generateReportPreview?.();
           window.lucide?.createIcons?.();
         }
-        if (window.appState) {
-          window.appState.lastUpdatedAt = offlineState.updatedAt;
-        }
+        window.lastUpdatedAt = offlineState.updatedAt;
         await window.saveAutosaveToCloud?.();
       }
     }
