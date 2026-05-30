@@ -10,7 +10,6 @@
   <script>
     // Chủ động không tải element_sdk.js để tránh 404; fallback này giữ ứng dụng không bị lỗi nếu có lời gọi ElementSDK.
     if (!window.ElementSDK) {
-      console.warn('⚠️ element_sdk.js không khả dụng. Hệ thống đang dùng fallback tương thích.');
       const elementSdkNoop = () => {};
       window.ElementSDK = new Proxy({}, {
         get(target, prop) { return elementSdkNoop; }
@@ -86,7 +85,7 @@
     <div class="max-w-7xl mx-auto flex flex-col sm:flex-row justify-between items-center gap-3">
       <div class="flex items-center gap-3">
         <div class="p-2 bg-black/20 rounded-lg">
-          <i data-lucide="alert-triangle" class="w-6 h-6 text-amber-200"></i>
+          <span data-lucide="alert-triangle" class="w-6 h-6 text-amber-200"></span>
         </div>
         <div>
           <strong class="text-sm font-bold block uppercase tracking-wide">⚠️ Phát hiện hệ thống vừa khởi động lại sau sự cố đột ngột</strong>
@@ -95,7 +94,7 @@
       </div>
       <div class="flex gap-2 shrink-0">
         <button onclick="downloadBackup()" class="bg-white text-rose-700 hover:bg-slate-100 px-4 py-2 rounded-lg text-xs font-bold transition shadow-md flex items-center gap-1.5 active:scale-95">
-          <i data-lucide="download" class="w-3.5 h-3.5"></i> Tải file sao lưu (.json)
+          <span data-lucide="download" class="w-3.5 h-3.5"></span> Tải file sao lưu (.json)
         </button>
         <button onclick="dismissIncidentBanner()" class="bg-black/30 hover:bg-black/45 text-white px-3 py-2 rounded-lg text-xs font-semibold transition">
           Bỏ qua
@@ -121,24 +120,24 @@
     </div>
   </div>
   
-  <div id="app" class="w-full h-full flex flex-col no-print">
+  <div id="app" class="w-full h-full flex flex-col overflow-hidden no-print">
    <!-- Header -->
    <header class="bg-gradient-to-r from-indigo-700 via-purple-700 to-indigo-800 p-4 shadow-lg flex flex-col md:flex-row md:justify-between md:items-center gap-2">
     <div>
       <h1 id="main-title" class="text-xl md:text-2xl font-bold flex items-center gap-2">
-        <i data-lucide="database" class="w-6 h-6 text-purple-300"></i> Quản Lý Học Sinh & Thi Đua THCS
+        <span data-lucide="database" class="w-6 h-6 text-purple-300"></span> Quản Lý Học Sinh & Thi Đua THCS
       </h1>
       <p id="system-mode-text" class="text-indigo-200 text-xs md:text-sm mt-0.5">Đang khởi động hệ thống...</p>
     </div>
     <div class="flex flex-wrap gap-2 self-start md:self-auto">
       <button onclick="openQrModal()" class="bg-emerald-600 hover:bg-emerald-500 px-3 py-1.5 rounded-lg text-xs font-bold text-white border border-emerald-400/30 transition flex items-center gap-1.5 shadow">
-        <i data-lucide="qr-code" class="w-3.5 h-3.5"></i> Kết nối Điện thoại (QR)
+        <span data-lucide="qr-code" class="w-3.5 h-3.5"></span> Kết nối Điện thoại (QR)
       </button>
       <button onclick="loadSampleData()" class="bg-indigo-600 hover:bg-indigo-500 px-3 py-1.5 rounded-lg text-xs font-semibold text-white border border-indigo-400/30 transition flex items-center gap-1.5 shadow">
-        <i data-lucide="info" class="w-3.5 h-3.5"></i> Sử dụng dữ liệu mẫu
+        <span data-lucide="info" class="w-3.5 h-3.5"></span> Sử dụng dữ liệu mẫu
       </button>
       <button onclick="clearAllDataPrompt()" class="bg-rose-600 hover:bg-rose-500 px-3 py-1.5 rounded-lg text-xs font-semibold text-white border border-rose-500/30 transition flex items-center gap-1.5 shadow">
-        <i data-lucide="trash-2" class="w-3.5 h-3.5"></i> Xóa sạch dữ liệu
+        <span data-lucide="trash-2" class="w-3.5 h-3.5"></span> Xóa sạch dữ liệu
       </button>
     </div>
    </header>
@@ -146,37 +145,37 @@
    <!-- Tabs Navigation (Responsive design) -->
    <nav class="flex bg-slate-800 border-b border-slate-700 sticky top-0 z-30 overflow-x-auto scrollbar-none">
     <button onclick="switchTab('import')" id="tab-import" class="flex-1 min-w-[120px] py-2.5 px-3 mx-1 my-1.5 text-xs md:text-sm rounded-lg transition flex items-center justify-center whitespace-nowrap bg-indigo-600 text-white font-bold"> 
-      <i data-lucide="upload" class="inline w-4 h-4 mr-1.5"></i>Nhập Excel / Sao Lưu
+      <span data-lucide="upload" class="inline w-4 h-4 mr-1.5"></span>Nhập Excel / Sao Lưu
     </button> 
     <button onclick="switchTab('search')" id="tab-search" class="flex-1 min-w-[120px] py-2.5 px-3 mx-1 my-1.5 text-xs md:text-sm rounded-lg transition flex items-center justify-center whitespace-nowrap bg-slate-900/50 text-slate-300 font-medium"> 
-      <i data-lucide="search" class="inline w-4 h-4 mr-1.5"></i>Tra cứu học sinh
+      <span data-lucide="search" class="inline w-4 h-4 mr-1.5"></span>Tra cứu học sinh
     </button>
     <button onclick="switchTab('rules')" id="tab-rules" class="flex-1 min-w-[120px] py-2.5 px-3 mx-1 my-1.5 text-xs md:text-sm rounded-lg transition flex items-center justify-center whitespace-nowrap bg-slate-900/50 text-slate-300 font-medium"> 
-      <i data-lucide="shield-alert" class="inline w-4 h-4 mr-1.5"></i>Danh mục Lỗi
+      <span data-lucide="shield-alert" class="inline w-4 h-4 mr-1.5"></span>Danh mục Lỗi
     </button>
     <button onclick="switchTab('logs')" id="tab-logs" class="flex-1 min-w-[120px] py-2.5 px-3 mx-1 my-1.5 text-xs md:text-sm rounded-lg transition flex items-center justify-center whitespace-nowrap bg-slate-900/50 text-slate-300 font-medium"> 
-      <i data-lucide="history" class="inline w-4 h-4 mr-1.5"></i>Sổ tay Vi phạm
+      <span data-lucide="history" class="inline w-4 h-4 mr-1.5"></span>Sổ tay Vi phạm
     </button>
     <button onclick="switchTab('report')" id="tab-report" class="flex-1 min-w-[120px] py-2.5 px-3 mx-1 my-1.5 text-xs md:text-sm rounded-lg transition flex items-center justify-center whitespace-nowrap bg-slate-900/50 text-slate-300 font-medium"> 
-      <i data-lucide="award" class="inline w-4 h-4 mr-1.5"></i>Xem Báo cáo & Thi đua
+      <span data-lucide="award" class="inline w-4 h-4 mr-1.5"></span>Xem Báo cáo & Thi đua
     </button>
    </nav>
 
    <!-- Main Content Window -->
-   <div class="flex-1 min-h-0 overflow-auto p-4 md:p-6 max-w-7xl w-full mx-auto space-y-6">
+   <div class="flex-1 min-h-0 overflow-y-auto overflow-x-hidden p-4 md:p-6 max-w-7xl w-full mx-auto space-y-6">
     
     <!-- 1. IMPORT TAB PANEL -->
     <div id="panel-import" class="space-y-6">
      <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
        <!-- Left column: Excel Upload -->
        <div class="lg:col-span-2 bg-slate-800 rounded-xl p-6 border-2 border-dashed border-slate-600 text-center hover:border-indigo-500 transition-colors flex flex-col justify-center min-h-[220px]">
-        <i data-lucide="file-spreadsheet" class="mx-auto w-12 h-12 text-indigo-400 mb-2"></i>
+        <span data-lucide="file-spreadsheet" class="mx-auto w-12 h-12 text-indigo-400 mb-2"></span>
         <h3 class="text-base font-bold mb-1 text-slate-100">Nạp danh sách từ tệp Excel</h3>
         <p class="text-slate-400 text-xs max-w-md mx-auto mb-4">Hệ thống áp dụng thuật toán phân khúc chống treo trình duyệt khi đọc file dữ liệu lớn.</p>
         
         <div>
           <label class="inline-flex bg-indigo-600 hover:bg-indigo-500 active:scale-95 px-5 py-2 rounded-lg text-xs font-semibold cursor-pointer transition shadow-lg items-center gap-2"> 
-            <i data-lucide="upload" class="w-3.5 h-3.5"></i> Chọn file Excel (.xlsx, .xls)
+            <span data-lucide="upload" class="w-3.5 h-3.5"></span> Chọn file Excel (.xlsx, .xls)
             <input type="file" id="file-input" accept=".xlsx,.xls" onchange="handleFile(event)" class="hidden"> 
           </label>
         </div>
@@ -186,7 +185,7 @@
        <div class="bg-slate-800/90 rounded-xl p-5 border border-slate-700 flex flex-col justify-between">
          <div>
            <h3 class="font-bold text-sm text-indigo-300 flex items-center gap-2 mb-2">
-             <i data-lucide="shield-check" class="w-4 h-4 text-emerald-400"></i> Sao lưu & Khôi phục thủ công
+             <span data-lucide="shield-check" class="w-4 h-4 text-emerald-400"></span> Sao lưu & Khôi phục thủ công
            </h3>
            <p class="text-slate-400 text-[11px] leading-relaxed mb-4">
              Đảm bảo an toàn tuyệt đối cho dữ liệu học đường bao gồm danh sách học sinh, danh mục lỗi và sổ ghi nhận vi phạm tuần tự.
@@ -196,12 +195,12 @@
          <div class="space-y-2.5">
            <!-- Export Backup -->
            <button onclick="downloadBackup()" class="w-full bg-slate-700/80 hover:bg-slate-700 text-white border border-slate-600 py-2.5 px-4 rounded-lg text-xs font-semibold flex items-center justify-center gap-2 transition active:scale-95">
-             <i data-lucide="download-cloud" class="w-4 h-4 text-sky-400"></i> Xuất file Sao lưu hệ thống (.json)
+             <span data-lucide="download-cloud" class="w-4 h-4 text-sky-400"></span> Xuất file Sao lưu hệ thống (.json)
            </button>
            
            <!-- Import Backup -->
            <label class="w-full bg-emerald-700/40 hover:bg-emerald-700/60 text-emerald-300 border border-emerald-500/30 py-2.5 px-4 rounded-lg text-xs font-semibold flex items-center justify-center gap-2 transition cursor-pointer active:scale-95 text-center">
-             <i data-lucide="upload-cloud" class="w-4 h-4 text-emerald-400"></i> Khôi phục dữ liệu từ file (.json)
+             <span data-lucide="upload-cloud" class="w-4 h-4 text-emerald-400"></span> Khôi phục dữ liệu từ file (.json)
              <input type="file" id="backup-input" accept=".json" onchange="handleJsonRestore(event)" class="hidden">
            </label>
          </div>
@@ -214,7 +213,7 @@
      <div id="mapping-card" class="hidden bg-slate-800 rounded-xl p-5 border border-slate-700 space-y-4 shadow-xl">
        <div class="border-b border-slate-700 pb-3 flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2">
          <h3 class="font-bold text-base text-indigo-300 flex items-center gap-2">
-           <i data-lucide="settings-2" class="w-5 h-5"></i> Cấu hình liên kết cột dữ liệu Excel
+           <span data-lucide="settings-2" class="w-5 h-5"></span> Cấu hình liên kết cột dữ liệu Excel
          </h3>
          <div class="flex items-center gap-2 bg-slate-900 px-3 py-1.5 rounded-lg border border-slate-700">
            <label class="text-xs text-slate-400 whitespace-nowrap">Chọn Sheet:</label>
@@ -271,7 +270,7 @@
 
        <div class="flex justify-end pt-2 border-t border-slate-700">
          <button onclick="confirmImport()" class="bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 px-6 py-2.5 rounded-lg text-sm font-semibold text-white shadow-lg flex items-center gap-2 transition-transform active:scale-95">
-           <i data-lucide="user-check" class="w-4 h-4"></i> Xác nhận và nạp dữ liệu học sinh
+           <span data-lucide="user-check" class="w-4 h-4"></span> Xác nhận và nạp dữ liệu học sinh
          </button>
        </div>
      </div>
@@ -280,7 +279,7 @@
      <div id="preview-section" class="hidden space-y-3">
       <div class="flex justify-between items-center">
         <h3 class="font-bold text-slate-300 flex items-center gap-1.5">
-          <i data-lucide="eye" class="w-4 h-4 text-indigo-400"></i> Danh sách nhập trước (Xem thử 5 học sinh đầu)
+          <span data-lucide="eye" class="w-4 h-4 text-indigo-400"></span> Danh sách nhập trước (Xem thử 5 học sinh đầu)
         </h3>
         <span class="text-xs text-slate-400">Lưu trong bộ nhớ tạm</span>
       </div>
@@ -291,7 +290,7 @@
     <!-- 2. SEARCH TAB PANEL -->
     <div id="panel-search" class="hidden space-y-4">
      <div class="relative">
-      <i data-lucide="search" class="absolute left-3.5 top-3.5 w-5 h-5 text-slate-400"></i> 
+      <span data-lucide="search" class="absolute left-3.5 top-3.5 w-5 h-5 text-slate-400"></span> 
       <input id="search-input" type="text" placeholder="Tìm tên học sinh (Ví dụ: Thảo, Thành, Bảo... hoặc gõ lớp, SĐT)" oninput="onSearchInput(this.value)" class="w-full bg-slate-800 border border-slate-600 rounded-xl pl-11 pr-4 py-3.5 text-white placeholder-slate-450 focus:outline-none focus:border-indigo-500 transition-all shadow-inner text-base">
      </div>
      
@@ -312,7 +311,7 @@
      <!-- Pagination / Lazy Load -->
      <div id="search-more-container" class="hidden text-center py-4">
        <button onclick="showMoreSearchResults()" class="bg-indigo-600 hover:bg-indigo-500 text-white px-6 py-3 rounded-xl text-xs font-bold transition shadow-lg inline-flex items-center gap-2 active:scale-95">
-         <i data-lucide="chevrons-down" class="w-4 h-4"></i> Xem thêm kết quả...
+         <span data-lucide="chevrons-down" class="w-4 h-4"></span> Xem thêm kết quả...
        </button>
      </div>
 
@@ -322,7 +321,7 @@
        <div class="flex justify-between items-center">
         <h3 class="font-bold text-lg text-slate-200">Hồ Sơ Học Sinh Chi Tiết</h3>
         <button onclick="closeDetail()" class="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-700 transition">
-          <i data-lucide="x" class="w-5 h-5"></i>
+          <span data-lucide="x" class="w-5 h-5"></span>
         </button>
        </div>
        <div id="detail-content" class="space-y-4"></div>
@@ -334,10 +333,10 @@
        <div class="bg-slate-800 rounded-2xl w-full max-w-md p-6 space-y-4 border border-red-500/30 shadow-2xl relative">
          <div class="flex justify-between items-center pb-2 border-b border-slate-700">
            <h3 class="font-bold text-base text-rose-400 flex items-center gap-1.5">
-             <i data-lucide="shield-alert" class="w-5 h-5 text-red-500"></i> Ghi nhận vi phạm học sinh
+             <span data-lucide="shield-alert" class="w-5 h-5 text-red-500"></span> Ghi nhận vi phạm học sinh
            </h3>
            <button onclick="closeViolationModal()" class="p-1.5 rounded-lg text-slate-450 hover:text-white transition">
-             <i data-lucide="x" class="w-4 h-4"></i>
+             <span data-lucide="x" class="w-4 h-4"></span>
            </button>
          </div>
          
@@ -403,7 +402,7 @@
            </span>
            <button onclick="closeViolationModal()" class="bg-slate-700 hover:bg-slate-600 text-slate-300 px-4 py-2 rounded-lg text-xs font-semibold">Hủy bỏ</button>
            <button id="violation-save-btn" onclick="saveStudentViolation()" class="bg-red-600 hover:bg-red-500 text-white px-5 py-2 rounded-lg text-xs font-bold shadow-lg flex items-center gap-1.5 transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-red-600">
-             <i data-lucide="check" class="w-3.5 h-3.5"></i> Xác nhận vi phạm
+             <span data-lucide="check" class="w-3.5 h-3.5"></span> Xác nhận vi phạm
            </button>
          </div>
        </div>
@@ -417,7 +416,7 @@
         <div class="bg-slate-800 rounded-xl p-5 border border-slate-700 space-y-4">
           <div class="border-b border-slate-700 pb-2">
             <h3 id="rule-form-title" class="font-bold text-sm text-indigo-300 flex items-center gap-1.5">
-              <i data-lucide="plus-circle" class="w-4 h-4 text-emerald-400"></i> Thêm lỗi vi phạm mới
+              <span data-lucide="plus-circle" class="w-4 h-4 text-emerald-400"></span> Thêm lỗi vi phạm mới
             </h3>
           </div>
           <input type="hidden" id="edit-rule-id" value="">
@@ -450,7 +449,7 @@
           <div class="flex justify-end gap-2 pt-2 border-t border-slate-700">
             <button id="rule-cancel-btn" onclick="resetRuleForm()" class="hidden bg-slate-700 hover:bg-slate-600 text-slate-300 px-3 py-1.5 rounded-lg text-xs font-semibold">Hủy sửa</button>
             <button onclick="saveRule()" class="bg-indigo-600 hover:bg-indigo-500 text-white px-4 py-1.5 rounded-lg text-xs font-semibold shadow flex items-center gap-1.5">
-              <i data-lucide="check" class="w-3.5 h-3.5"></i> Lưu cấu hình lỗi
+              <span data-lucide="check" class="w-3.5 h-3.5"></span> Lưu cấu hình lỗi
             </button>
           </div>
         </div>
@@ -459,7 +458,7 @@
         <div class="lg:col-span-2 bg-slate-800 rounded-xl p-5 border border-slate-700 space-y-4">
           <div class="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2 pb-2 border-b border-slate-700">
             <h3 class="font-bold text-sm text-slate-200 flex items-center gap-1.5">
-              <i data-lucide="list-todo" class="w-4 h-4 text-indigo-400"></i> Danh mục quy chế lỗi & Điểm trừ
+              <span data-lucide="list-todo" class="w-4 h-4 text-indigo-400"></span> Danh mục quy chế lỗi & Điểm trừ
             </h3>
             <span id="rules-count-badge" class="bg-slate-900 text-slate-400 text-2xs px-2 py-0.5 rounded-full border border-slate-700">0 lỗi</span>
           </div>
@@ -490,7 +489,7 @@
         <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-3 border-b border-slate-700 pb-3">
           <div>
             <h3 class="font-bold text-slate-200 flex items-center gap-1.5">
-              <i data-lucide="book-open" class="w-5 h-5 text-indigo-400"></i> Sổ tay theo dõi & Nhật ký vi phạm
+              <span data-lucide="book-open" class="w-5 h-5 text-indigo-400"></span> Sổ tay theo dõi & Nhật ký vi phạm
             </h3>
             <p class="text-xs text-slate-400 mt-0.5">Nơi lưu giữ, chỉnh sửa và quản lý lịch sử sai sót của học sinh</p>
           </div>
@@ -499,7 +498,7 @@
               <option value="all">Tất cả các tuần</option>
             </select>
             <button id="lock-week-btn" onclick="toggleWeekLock()" class="bg-amber-600 hover:bg-amber-500 text-white px-3 py-1.5 rounded text-xs font-bold shadow transition active:scale-95 flex items-center gap-1.5">
-              <i data-lucide="lock" class="w-3.5 h-3.5"></i>
+              <span data-lucide="lock" class="w-3.5 h-3.5"></span>
               <span id="lock-week-btn-text">Khóa tuần</span>
             </button>
             <input type="text" id="log-search-input" oninput="renderViolationLogs()" placeholder="Tìm tên HS, lớp..." class="bg-slate-700 text-xs border border-slate-600 rounded px-2.5 py-1.5 text-white focus:outline-none placeholder-slate-400 w-44">
@@ -526,12 +525,12 @@
             </tbody>
           </table>
           <div id="logs-empty-view" class="hidden py-12 text-center text-slate-500 space-y-2">
-            <i data-lucide="file-check-2" class="w-10 h-10 mx-auto text-slate-600"></i>
+            <span data-lucide="file-check-2" class="w-10 h-10 mx-auto text-slate-600"></span>
             <p class="font-semibold text-slate-400 text-xs">Không phát hiện lượt vi phạm nào trùng khớp với bộ lọc</p>
           </div>
           <div id="logs-history-footer" class="hidden py-3 text-center">
             <button onclick="expandViolationLogsHistory()" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-700 hover:bg-slate-600 text-slate-200 text-xs font-semibold transition">
-              <i data-lucide="history" class="w-3.5 h-3.5"></i> Xem thêm lịch sử...
+              <span data-lucide="history" class="w-3.5 h-3.5"></span> Xem thêm lịch sử...
             </button>
           </div>
         </div>
@@ -543,7 +542,7 @@
      <!-- Quick Dashboard stats -->
      <div class="bg-slate-800 rounded-xl p-5 border border-slate-700 space-y-4">
       <h3 class="font-bold text-slate-200 flex items-center gap-1.5 text-base">
-        <i data-lucide="bar-chart-3" class="w-5 h-5 text-indigo-400"></i> Phân tích tổng quan số lượng học sinh các khối lớp
+        <span data-lucide="bar-chart-3" class="w-5 h-5 text-indigo-400"></span> Phân tích tổng quan số lượng học sinh các khối lớp
       </h3>
       <div id="stats" class="grid grid-cols-2 md:grid-cols-5 gap-3"></div>
      </div>
@@ -616,13 +615,13 @@
 
          <div class="space-y-2">
            <button onclick="exportReport()" class="w-full bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 py-3 rounded-xl font-bold transition shadow-lg flex items-center justify-center gap-2 hover:-translate-y-0.5 active:translate-y-0 text-sm"> 
-             <i data-lucide="file-spreadsheet" class="w-5 h-5"></i> Xuất Excel Bản Đẹp 
+             <span data-lucide="file-spreadsheet" class="w-5 h-5"></span> Xuất Excel Bản Đẹp 
            </button>
            <button onclick="printReport()" class="w-full bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-500 hover:to-blue-500 py-3 rounded-xl font-bold transition shadow-lg flex items-center justify-center gap-2 hover:-translate-y-0.5 active:translate-y-0 text-sm"> 
-             <i data-lucide="printer" class="w-5 h-5"></i> In báo cáo ngay
+             <span data-lucide="printer" class="w-5 h-5"></span> In báo cáo ngay
            </button>
            <button onclick="shareReportToZalo()" class="w-full bg-gradient-to-r from-[#0084ff] to-[#0068ff] hover:from-[#0f92ff] hover:to-[#0b72ff] py-3 rounded-xl font-bold transition shadow-lg flex items-center justify-center gap-2 hover:-translate-y-0.5 active:translate-y-0 text-sm">
-             <i data-lucide="share-2" class="w-5 h-5"></i> Chia sẻ qua Zalo
+             <span data-lucide="share-2" class="w-5 h-5"></span> Chia sẻ qua Zalo
            </button>
          </div>
        </div>
@@ -630,7 +629,7 @@
        <!-- Live Sheet Document Preview -->
        <div class="lg:col-span-3 space-y-2">
          <h4 class="font-bold text-sm text-slate-300 flex items-center gap-1.5">
-           <i data-lucide="eye" class="w-4 h-4 text-emerald-400"></i> 2. Bản xem trước trang in
+           <span data-lucide="eye" class="w-4 h-4 text-emerald-400"></span> 2. Bản xem trước trang in
          </h4>
          <div class="bg-white text-slate-900 rounded-xl p-6 shadow-2xl overflow-x-auto min-h-[600px] border border-slate-200">
            <!-- Page Paper Container -->
@@ -655,10 +654,10 @@
     <div class="bg-slate-800 rounded-2xl w-full max-w-md p-6 gap-5 border border-indigo-500/30 shadow-2xl relative max-h-[92vh] overflow-y-auto flex flex-col">
       <div class="flex justify-between items-center pb-2 border-b border-slate-700">
         <h3 class="font-bold text-base text-emerald-400 flex items-center gap-2">
-          <i data-lucide="qr-code" class="w-5 h-5"></i> Kết nối thiết bị di động
+          <span data-lucide="qr-code" class="w-5 h-5"></span> Kết nối thiết bị di động
         </h3>
         <button onclick="closeQrModal()" class="p-1.5 rounded-lg text-slate-450 hover:text-white transition">
-          <i data-lucide="x" class="w-5 h-5"></i>
+          <span data-lucide="x" class="w-5 h-5"></span>
         </button>
       </div>
 
@@ -682,7 +681,7 @@
       <div class="bg-slate-900/50 p-3.5 rounded-xl border border-slate-700/60 space-y-2.5">
         <div class="flex justify-between items-center">
           <label class="text-xs font-bold text-slate-300 flex items-center gap-1">
-            <i data-lucide="radio" class="w-3.5 h-3.5 text-indigo-400 animate-pulse"></i> Mã Kênh Đồng Bộ (Shared Code)
+            <span data-lucide="radio" class="w-3.5 h-3.5 text-indigo-400 animate-pulse"></span> Mã Kênh Đồng Bộ (Shared Code)
           </label>
           <span class="text-4xs uppercase font-extrabold tracking-widest bg-emerald-950 text-emerald-400 px-2 py-0.5 rounded border border-emerald-500/20">Thời gian thực</span>
         </div>
@@ -696,7 +695,7 @@
       </div>
 
       <div class="text-2xs text-slate-450 border-t border-slate-700 pt-3 space-y-1">
-        <p class="font-bold flex items-center gap-1 text-indigo-300"><i data-lucide="help-circle" class="w-3.5 h-3.5"></i> Hướng dẫn kết nối:</p>
+        <p class="font-bold flex items-center gap-1 text-indigo-300"><span data-lucide="help-circle" class="w-3.5 h-3.5"></span> Hướng dẫn kết nối:</p>
         <p>1. Điện thoại và máy tính nên truy cập chung một link liên kết (hoặc đưa tệp HTML này lên host như Github Pages/Vercel).</p>
         <p>2. Khi mở bằng điện thoại, hãy bấm mở QR và kiểm tra Mã Kênh đã trùng khớp hoàn toàn.</p>
       </div>
@@ -708,10 +707,10 @@
     <div class="bg-slate-800 rounded-2xl w-full max-w-md p-6 space-y-4 border border-rose-500/30 shadow-2xl relative">
       <div class="flex justify-between items-center pb-2 border-b border-slate-700">
         <h3 class="font-bold text-base text-rose-400 flex items-center gap-1.5">
-          <i data-lucide="alert-circle" class="w-5 h-5 text-rose-500"></i> Hướng dẫn kích hoạt Đám mây
+          <span data-lucide="alert-circle" class="w-5 h-5 text-rose-500"></span> Hướng dẫn kích hoạt Đám mây
         </h3>
         <button onclick="closeTroubleshootModal()" class="p-1.5 rounded-lg text-slate-450 hover:text-white transition">
-          <i data-lucide="x" class="w-4 h-4"></i>
+          <span data-lucide="x" class="w-4 h-4"></span>
         </button>
       </div>
 
@@ -752,7 +751,7 @@ service cloud.firestore {
   <div id="confirm-modal" class="hidden fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
     <div class="bg-slate-800 rounded-xl max-w-sm w-full p-5 border border-slate-700 shadow-2xl space-y-4">
       <div class="flex items-center gap-2 text-rose-400">
-        <i data-lucide="alert-circle" class="w-6 h-6"></i>
+        <span data-lucide="alert-circle" class="w-6 h-6"></span>
         <h4 id="confirm-title" class="font-bold text-base">Xác nhận yêu cầu</h4>
       </div>
       <p id="confirm-message" class="text-xs text-slate-300 leading-relaxed">Bạn có chắc chắn muốn thực hiện thao tác này? Thao tác này không thể thu hồi.</p>
@@ -961,7 +960,7 @@ service cloud.firestore {
         isCloudMode = false;
         modeText.innerHTML = `
           <span class="text-rose-400 font-bold flex items-center gap-1 cursor-pointer" onclick="showFirebaseTroubleshoot()">
-            <i data-lucide="alert-circle" class="w-4 h-4 inline"></i> Chế độ Đám mây lỗi (Bấm để xem chi tiết)
+            <span data-lucide="alert-circle" class="w-4 h-4 inline"></span> Chế độ Đám mây lỗi (Bấm để xem chi tiết)
           </span>
         `;
         lucide.createIcons();
@@ -1067,7 +1066,7 @@ service cloud.firestore {
         console.error("Realtime sync channel rejected:", err);
         document.getElementById('system-mode-text').innerHTML = `
           <span class="text-rose-400 font-bold flex items-center gap-1 cursor-pointer" onclick="showFirebaseTroubleshoot()">
-            <i data-lucide="alert-circle" class="w-4 h-4 inline"></i> Lỗi đồng bộ dữ liệu (Click xem)
+            <span data-lucide="alert-circle" class="w-4 h-4 inline"></span> Lỗi đồng bộ dữ liệu (Click xem)
           </span>
         `;
         lucide.createIcons();
@@ -1631,7 +1630,7 @@ service cloud.firestore {
         setTimeout(async () => {
           const status = document.getElementById('import-status');
           status.classList.remove('hidden');
-          status.innerHTML = `<i data-lucide="check" class="w-4 h-4 text-emerald-400"></i> Đã tải thành công <strong>${students.length} học sinh mẫu</strong> & <strong>${violations.length} kỷ luật thi đua mẫu</strong>!`;
+          status.innerHTML = `<span data-lucide="check" class="w-4 h-4 text-emerald-400"></span> Đã tải thành công <strong>${students.length} học sinh mẫu</strong> & <strong>${violations.length} kỷ luật thi đua mẫu</strong>!`;
           
           await saveAutosaveToCloud();
           showPreview(true);
@@ -1715,7 +1714,7 @@ service cloud.firestore {
             
             const status = document.getElementById('import-status');
             status.classList.remove('hidden');
-            status.innerHTML = `<i data-lucide="check-check" class="w-4 h-4 text-emerald-400"></i> Đã phục hồi <strong>${students.length} học sinh</strong> & <strong>${violations.length} vi phạm</strong> thành công!`;
+            status.innerHTML = `<span data-lucide="check-check" class="w-4 h-4 text-emerald-400"></span> Đã phục hồi <strong>${students.length} học sinh</strong> & <strong>${violations.length} vi phạm</strong> thành công!`;
             
             await saveAutosaveToCloud();
             showPreview(false);
@@ -2008,7 +2007,7 @@ service cloud.firestore {
             
             const status = document.getElementById('import-status');
             status.classList.remove('hidden');
-            status.innerHTML = `<i data-lucide="check" class="w-4 h-4 text-emerald-400"></i> Đã nạp thành công <strong>${students.length} học sinh</strong> từ file của bạn!`;
+            status.innerHTML = `<span data-lucide="check" class="w-4 h-4 text-emerald-400"></span> Đã nạp thành công <strong>${students.length} học sinh</strong> từ file của bạn!`;
             
             await saveAutosaveToCloud();
             showPreview(false);
@@ -2151,7 +2150,7 @@ service cloud.firestore {
       const loadMoreBtn = document.getElementById('search-more-container');
       
       if (students.length === 0) {
-        count.innerHTML = '<span class="text-rose-400 flex items-center gap-1"><i data-lucide="info" class="w-4 h-4"></i> Hệ thống trống. Hãy nạp file Excel hoặc khôi phục sao lưu!</span>';
+        count.innerHTML = '<span class="text-rose-400 flex items-center gap-1"><span data-lucide="info" class="w-4 h-4"></span> Hệ thống trống. Hãy nạp file Excel hoặc khôi phục sao lưu!</span>';
         fontAwesomePatch.innerHTML = '';
         loadMoreBtn.classList.add('hidden');
         lucide.createIcons();
@@ -2177,7 +2176,7 @@ service cloud.firestore {
         count.textContent = originalQuery ? 'Không tìm thấy học sinh phù hợp!' : 'Chọn khối để hiển thị';
         fontAwesomePatch.innerHTML = `
           <div class="col-span-full py-12 text-center text-slate-500 space-y-2">
-            <i data-lucide="search-code" class="w-12 h-12 mx-auto text-slate-600"></i>
+            <span data-lucide="search-code" class="w-12 h-12 mx-auto text-slate-600"></span>
             <p class="font-semibold text-slate-400">Không tìm thấy kết quả trùng khớp với "${originalQuery}"</p>
             <p class="text-xs text-slate-500">Mẹo: Hệ thống hỗ trợ tìm kiếm không dấu lẫn có dấu tự động!</p>
           </div>
@@ -2243,7 +2242,7 @@ service cloud.firestore {
           </div>
           <div class="flex flex-col gap-1 ml-2 shrink-0">
             <button onclick="openViolationModal(${realIdx})" ${currentWeekLocked ? 'disabled title="Tuần hiện tại đã khóa sổ thi đua"' : ''} class="${currentWeekLocked ? 'bg-slate-600 text-slate-300 cursor-not-allowed' : 'bg-red-600 hover:bg-red-500 text-white'} px-2.5 py-1.5 rounded-lg text-2xs font-extrabold flex items-center gap-1 shadow transition active:scale-95">
-              <i data-lucide="shield-alert" class="w-3.5 h-3.5"></i> Phạt lỗi
+              <span data-lucide="shield-alert" class="w-3.5 h-3.5"></span> Phạt lỗi
             </button>
             <button onclick="showDetail(${realIdx})" class="border border-slate-700/20 bg-slate-900/10 hover:bg-slate-900/20 text-slate-800 px-2.5 py-1.5 rounded-lg text-2xs font-bold transition active:scale-95 text-center">
               Chi tiết
@@ -2390,31 +2389,31 @@ service cloud.firestore {
         
         <div class="space-y-1.5 text-xs text-slate-300">
           <div class="flex justify-between items-center py-2 border-b border-slate-700/60">
-            <span class="text-slate-400 flex items-center gap-2"><i data-lucide="id-card" class="w-4 h-4"></i> Lớp học</span>
+            <span class="text-slate-400 flex items-center gap-2"><span data-lucide="id-card" class="w-4 h-4"></span> Lớp học</span>
             <span class="font-bold text-slate-100">${s.class}</span>
           </div>
           <div class="flex justify-between items-center py-2 border-b border-slate-700/60">
-            <span class="text-slate-400 flex items-center gap-2"><i data-lucide="user" class="w-4 h-4"></i> Giới tính</span>
+            <span class="text-slate-400 flex items-center gap-2"><span data-lucide="user" class="w-4 h-4"></span> Giới tính</span>
             <span class="font-bold text-slate-100">${s.gender}</span>
           </div>
           <div class="flex justify-between items-center py-2 border-b border-slate-700/60">
-            <span class="text-slate-400 flex items-center gap-2"><i data-lucide="calendar" class="w-4 h-4"></i> Năm sinh</span>
+            <span class="text-slate-400 flex items-center gap-2"><span data-lucide="calendar" class="w-4 h-4"></span> Năm sinh</span>
             <span class="font-bold text-slate-100">${s.birthYear}</span>
           </div>
           <div class="flex justify-between items-center py-2 border-b border-slate-700/60">
-            <span class="text-slate-400 flex items-center gap-2"><i data-lucide="phone" class="w-4 h-4"></i> Số điện thoại 1</span>
+            <span class="text-slate-400 flex items-center gap-2"><span data-lucide="phone" class="w-4 h-4"></span> Số điện thoại 1</span>
             <span class="font-bold text-slate-100">${s.phone}</span>
           </div>
           <div class="flex justify-between items-center py-2 border-b border-slate-700/60">
-            <span class="text-slate-400 flex items-center gap-2 text-indigo-400"><i data-lucide="phone-call" class="w-4 h-4"></i> SĐT 2 (Dự phòng)</span>
+            <span class="text-slate-400 flex items-center gap-2 text-indigo-400"><span data-lucide="phone-call" class="w-4 h-4"></span> SĐT 2 (Dự phòng)</span>
             <span class="font-bold text-indigo-300">${s.phone2 || 'Không có'}</span>
           </div>
           <div class="flex justify-between items-center py-2 border-b border-slate-700/60">
-            <span class="text-slate-400 flex items-center gap-2 text-emerald-400"><i data-lucide="home" class="w-4 h-4"></i> Trạng thái Bán trú</span>
+            <span class="text-slate-400 flex items-center gap-2 text-emerald-400"><span data-lucide="home" class="w-4 h-4"></span> Trạng thái Bán trú</span>
             <span class="font-bold ${s.boarding === 'Có' ? 'text-emerald-400' : 'text-rose-400'}">${s.boarding || 'Không'}</span>
           </div>
           <div class="flex justify-between items-center py-2.5">
-            <span class="text-slate-400 flex items-center gap-2 text-red-400"><i data-lucide="award" class="w-4 h-4"></i> Thi đua rèn luyện</span>
+            <span class="text-slate-400 flex items-center gap-2 text-red-400"><span data-lucide="award" class="w-4 h-4"></span> Thi đua rèn luyện</span>
             <span class="font-bold text-red-400 bg-red-950/40 px-3 py-1 border border-red-500/20 rounded-lg">Tổng điểm trừ: ${totalPoints}đ</span>
           </div>
         </div>
@@ -2459,10 +2458,10 @@ service cloud.firestore {
           <td class="py-2.5 px-2 text-center">
             <div class="flex justify-center gap-1.5">
               <button onclick="editRulePrompt('${rule.id}')" class="p-1 rounded bg-slate-900 hover:bg-slate-700 text-sky-400 transition" title="Sửa">
-                <i data-lucide="pencil" class="w-3.5 h-3.5"></i>
+                <span data-lucide="pencil" class="w-3.5 h-3.5"></span>
               </button>
               <button onclick="deleteRulePrompt('${rule.id}')" class="p-1 rounded bg-slate-900 hover:bg-rose-950/50 text-rose-500 transition" title="Xóa">
-                <i data-lucide="trash" class="w-3.5 h-3.5"></i>
+                <span data-lucide="trash" class="w-3.5 h-3.5"></span>
               </button>
             </div>
           </td>
@@ -2480,7 +2479,7 @@ service cloud.firestore {
       document.getElementById('rule-points-input').value = rule.points;
       document.getElementById('rule-category-input').value = rule.category;
 
-      document.getElementById('rule-form-title').innerHTML = `<i data-lucide="edit-3" class="w-4 h-4 text-sky-400"></i> Hiệu chỉnh lỗi vi phạm`;
+      document.getElementById('rule-form-title').innerHTML = `<span data-lucide="pencil" class="w-4 h-4 text-sky-400"></span> Hiệu chỉnh lỗi vi phạm`;
       document.getElementById('rule-cancel-btn').classList.remove('hidden');
       lucide.createIcons();
     }
@@ -2491,7 +2490,7 @@ service cloud.firestore {
       document.getElementById('rule-points-input').value = '';
       document.getElementById('rule-category-input').value = 'Nề nếp';
 
-      document.getElementById('rule-form-title').innerHTML = `<i data-lucide="plus-circle" class="w-4 h-4 text-emerald-400"></i> Thêm lỗi vi phạm mới`;
+      document.getElementById('rule-form-title').innerHTML = `<span data-lucide="plus-circle" class="w-4 h-4 text-emerald-400"></span> Thêm lỗi vi phạm mới`;
       document.getElementById('rule-cancel-btn').classList.add('hidden');
       lucide.createIcons();
     }
@@ -2634,9 +2633,9 @@ service cloud.firestore {
           <td class="py-3 px-2 text-center">
             ${
               isWeekLocked(v.week)
-                ? `<span class="inline-flex items-center gap-1 px-2 py-1 rounded bg-amber-900/40 border border-amber-700/30 text-amber-300 text-3xs font-bold"><i data-lucide="lock" class="w-3 h-3"></i>Đã khóa</span>`
+                ? `<span class="inline-flex items-center gap-1 px-2 py-1 rounded bg-amber-900/40 border border-amber-700/30 text-amber-300 text-3xs font-bold"><span data-lucide="lock" class="w-3 h-3"></span>Đã khóa</span>`
                 : `<button onclick="deleteViolationLogPrompt('${v.id}')" class="p-1 rounded bg-slate-900 hover:bg-rose-950/40 text-rose-500 transition" title="Xóa ghi chép">
-                    <i data-lucide="trash" class="w-3.5 h-3.5"></i>
+                    <span data-lucide="trash" class="w-3.5 h-3.5"></span>
                   </button>`
             }
           </td>
@@ -2798,7 +2797,7 @@ service cloud.firestore {
       if (students.length === 0) {
         previewContainer.innerHTML = `
           <div class="text-center py-20 text-slate-400 space-y-3">
-            <i data-lucide="file-spreadsheet" class="w-16 h-16 mx-auto text-slate-300"></i>
+            <span data-lucide="file-spreadsheet" class="w-16 h-16 mx-auto text-slate-300"></span>
             <p class="text-sm font-semibold text-slate-500">Chưa có dữ liệu để lập báo cáo. Hãy chọn "Sử dụng dữ liệu mẫu" hoặc nạp từ tệp Excel!</p>
           </div>
         `;
@@ -2916,7 +2915,7 @@ service cloud.firestore {
         if (!scopeValue) {
           previewContainer.innerHTML = `
             <div class="text-center py-20 text-slate-400 space-y-3">
-              <i data-lucide="award" class="w-16 h-16 mx-auto text-slate-300"></i>
+              <span data-lucide="award" class="w-16 h-16 mx-auto text-slate-300"></span>
               <p class="text-sm font-semibold text-slate-500">Chưa có đủ thông tin hoặc mốc thời gian để kết xuất bảng thi đua.</p>
             </div>
           `;
@@ -3140,7 +3139,7 @@ service cloud.firestore {
         if (!scopeValue) {
           previewContainer.innerHTML = `
             <div class="text-center py-20 text-slate-400 space-y-3">
-              <i data-lucide="list-x" class="w-16 h-16 mx-auto text-slate-300"></i>
+              <span data-lucide="list-x" class="w-16 h-16 mx-auto text-slate-300"></span>
               <p class="text-sm font-semibold text-slate-500">Chưa có đủ thông tin hoặc mốc thời gian để kết xuất báo cáo vi phạm.</p>
             </div>
           `;
@@ -3491,11 +3490,7 @@ service cloud.firestore {
       return file;
     }
 
-    // Export beautiful styled excel spreadsheet matching selection parameters
-    function exportReport() {
-      const file = generateExcelFileBlob();
-      if (!file) return;
-
+    function downloadExcelFile(file) {
       const fileUrl = URL.createObjectURL(file);
       const link = document.createElement('a');
       link.href = fileUrl;
@@ -3504,10 +3499,18 @@ service cloud.firestore {
       link.click();
       document.body.removeChild(link);
       URL.revokeObjectURL(fileUrl);
+    }
+
+    // Export beautiful styled excel spreadsheet matching selection parameters
+    function exportReport() {
+      const file = generateExcelFileBlob();
+      if (!file) return;
+
+      downloadExcelFile(file);
       showToast('✓ Đã xuất file báo cáo Excel thành công!');
     }
 
-    function shareReportToZalo() {
+    async function shareReportToZalo() {
       const reportType = document.getElementById('report-type-select').value;
       if (reportType === 'students') {
         showToast('ℹ️ Hãy chọn báo cáo thi đua hoặc tổng hợp vi phạm để chia sẻ nhanh qua Zalo.');
@@ -3517,17 +3520,28 @@ service cloud.firestore {
       const file = generateExcelFileBlob();
       if (!file) return;
 
-      if (navigator.canShare && navigator.canShare({ files: [file] })) {
-        navigator.share({
-          files: [file],
-          title: 'Báo cáo vi phạm thi đua rèn luyện',
-          text: 'Gửi kết quả tổng hợp thi đua trường THCS Phạm Đình Hổ'
-        })
-        .then(() => showToast('✓ Đã mở khay chia sẻ Zalo thành công!'))
-        .catch((err) => console.log('Hủy chia sẻ:', err));
-      } else {
-        showToast('⚠️ Thiết bị/trình duyệt chưa hỗ trợ chia sẻ tệp trực tiếp.');
+      const isMobileDevice = /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent || '');
+      const canShareFile = isMobileDevice && navigator.canShare && navigator.canShare({ files: [file] });
+
+      if (canShareFile && navigator.share) {
+        try {
+          await navigator.share({
+            files: [file],
+            title: 'Báo cáo vi phạm thi đua rèn luyện',
+            text: 'Gửi kết quả tổng hợp thi đua trường THCS Phạm Đình Hổ'
+          });
+          showToast('✓ Đã mở khay chia sẻ hệ thống, chọn Zalo để gửi tệp.');
+          return;
+        } catch (err) {
+          if (err && err.name === 'AbortError') {
+            showToast('ℹ️ Đã hủy chia sẻ tệp.');
+            return;
+          }
+        }
       }
+
+      downloadExcelFile(file);
+      alert('💡 Đã xuất file Excel thành công! Thầy/Cô chỉ cần kéo thả tệp tin vừa tải ở góc màn hình vào khung chat ứng dụng Zalo để gửi ngay.');
     }
 
     // ----------------------------------------------------
