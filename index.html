@@ -9,7 +9,17 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
   <script>
     // Fallback tương thích khi gói element_sdk không tồn tại trong môi trường triển khai
-    window.ElementSDK = window.ElementSDK || {};
+    if (!window.ElementSDK) {
+      console.warn('⚠️ element_sdk.js không khả dụng. Hệ thống đang dùng fallback tương thích.');
+      window.ElementSDK = new Proxy({}, {
+        get(target, key) {
+          if (!target[key]) {
+            target[key] = () => console.warn(`⚠️ ElementSDK.${String(key)} không khả dụng trong fallback mode.`);
+          }
+          return target[key];
+        }
+      });
+    }
   </script>
   <link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@300;400;500;600;700&amp;display=swap" rel="stylesheet">
   <script type="text/javascript">
