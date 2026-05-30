@@ -1,0 +1,35 @@
+    * { font-family: 'Be Vietnam Pro', sans-serif; }
+    
+    /* Màu sắc theo khối lớp */
+    .grade-6 { background: #e0f2fe; border-left: 4px solid #0284c7; }
+    .grade-7 { background: #dcfce7; border-left: 4px solid #16a34a; }
+    .grade-8 { background: #fef3c7; border-left: 4px solid #d97706; }
+    .grade-9 { background: #fce7f3; border-left: 4px solid #db2777; }
+    
+    /* Thiết lập in ấn đặc biệt */
+    @media print {
+      body {
+        background: white !important;
+        color: black !important;
+      }
+      #app {
+        display: none !important;
+      }
+      #print-area {
+        display: block !important;
+        width: 100% !important;
+        margin: 0 !important;
+        padding: 0 !important;
+      }
+      .no-print {
+        display: none !important;
+      }
+    }
+    @media screen {
+      #print-area {
+        display: none;
+      }
+    }
+  
+
+body { box-sizing: border-box; }
