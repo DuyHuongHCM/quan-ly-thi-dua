@@ -7,7 +7,10 @@
   <script src="https://cdn.tailwindcss.com/3.4.17"></script>
   <script src="https://cdn.jsdelivr.net/npm/lucide@0.263.0/dist/umd/lucide.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-  <script src="./_sdk/element_sdk.js"></script>
+  <script>
+    // Fallback tương thích khi gói element_sdk không tồn tại trong môi trường triển khai
+    window.ElementSDK = window.ElementSDK || {};
+  </script>
   <link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@300;400;500;600;700&amp;display=swap" rel="stylesheet">
   <script type="text/javascript">
     // Cấu hình Firebase Cloud chế độ đám mây thời gian thực
@@ -612,8 +615,8 @@
            <button onclick="printReport()" class="w-full bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-500 hover:to-blue-500 py-3 rounded-xl font-bold transition shadow-lg flex items-center justify-center gap-2 hover:-translate-y-0.5 active:translate-y-0 text-sm"> 
              <i data-lucide="printer" class="w-5 h-5"></i> In báo cáo ngay
            </button>
-           <button onclick="shareReportToZalo()" class="w-full bg-gradient-to-r from-indigo-500 to-blue-500 hover:from-indigo-400 hover:to-blue-400 py-3 rounded-xl font-bold transition shadow-lg flex items-center justify-center gap-2 hover:-translate-y-0.5 active:translate-y-0 text-sm">
-             <i data-lucide="share-2" class="w-5 h-5"></i> Chia sẻ báo cáo qua Zalo
+           <button onclick="shareReportToZalo()" class="w-full bg-gradient-to-r from-[#0084ff] to-[#0068ff] hover:from-[#0f92ff] hover:to-[#0b72ff] py-3 rounded-xl font-bold transition shadow-lg flex items-center justify-center gap-2 hover:-translate-y-0.5 active:translate-y-0 text-sm">
+             <i data-lucide="share-2" class="w-5 h-5"></i> Chia sẻ qua Zalo
            </button>
          </div>
        </div>
@@ -2450,7 +2453,7 @@ service cloud.firestore {
           <td class="py-2.5 px-2 text-center">
             <div class="flex justify-center gap-1.5">
               <button onclick="editRulePrompt('${rule.id}')" class="p-1 rounded bg-slate-900 hover:bg-slate-700 text-sky-400 transition" title="Sửa">
-                <i data-lucide="edit" class="w-3.5 h-3.5"></i>
+                <i data-lucide="pencil" class="w-3.5 h-3.5"></i>
               </button>
               <button onclick="deleteRulePrompt('${rule.id}')" class="p-1 rounded bg-slate-900 hover:bg-rose-950/50 text-rose-500 transition" title="Xóa">
                 <i data-lucide="trash" class="w-3.5 h-3.5"></i>
